@@ -1,19 +1,10 @@
 
-import argparse
-import random
-import numpy as np
-import dynet as dy
-from config import  Config
-from reader import Reader
-from lstmcrf import BiLSTM_CRF
-import eval
-from tqdm import tqdm
-import math
 
-def setSeed(seed, dy_param):
+
+def setSeed(seed):
     random.seed(seed)
     np.random.seed(seed)
-    dy_param.set_random_seed(seed)
+    # dy_param.set_random_seed(seed)
 
 def parse_arguments(parser):
     parser.add_argument('--mode', type=str, default='train')
@@ -85,8 +76,8 @@ def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
                 loss.backward()
                 trainer.update()
         else:
-            # for inst in insts:
-            for inst in tqdm(insts):
+            for inst in insts:
+            # for inst in tqdm(insts):
                 dy.renew_cg()
                 loss = bicrf.negative_log(inst.input.words, inst.output)
                 loss_value = loss.value()
@@ -119,16 +110,35 @@ def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
     print("The best test: %.2f" % (best_test[0]))
 
 if __name__ == "__main__":
+    import argparse
+    import random
+    import numpy as np
+    from config import Config
+    from reader import Reader
+    from lstmcrf import BiLSTM_CRF
+    import eval
+    from tqdm import tqdm
+    import math
+
     parser = argparse.ArgumentParser(description="LSTM CRF implementation")
     opt = parse_arguments(parser)
     config = Config(opt)
 
-    dyparams = dy.DynetParams()
-    dyparams.set_autobatch(config.batch_size != 1)
-    reader = Reader(config.digit2zero)
-    setSeed(config.seed, dyparams)
+    import dynet_config
 
-    dyparams.init()
+    # dynet_config.set_gpu()
+    # Set some parameters manualy
+    dynet_config.set(mem=512, random_seed=1234, autobatch=config.batch_size!=1)
+    import dynet as dy
+
+
+    # dyparams = dy.DynetParams()
+    # dyparams.set_autobatch(config.batch_size != 1)
+    # dyparams.set_mem(2048)
+    reader = Reader(config.digit2zero)
+    setSeed(config.seed)
+
+    # dyparams.init()
 
     train_insts = reader.read_from_file(config.train_file, config.train_num)
     dev_insts = reader.read_from_file(config.dev_file, config.dev_num)
