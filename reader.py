@@ -12,7 +12,7 @@ class Reader:
 
     def __init__(self, digit2zero):
         self.digit2zero = digit2zero
-        self.all_vocab = {}
+        self.all_vocab = set()
 
 
     def read_from_file(self, file, number=-1):
@@ -35,7 +35,7 @@ class Reader:
                 if self.digit2zero:
                     word = re.sub('\d', '0', word)
                 words.append(word)
-                self.all_vocab[word] = 0
+                self.all_vocab.add(word)
                 labels.append(label)
         return insts
 

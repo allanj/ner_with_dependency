@@ -41,13 +41,14 @@ class Config:
         self.learning_rate = args.learning_rate
         self.momentum = args.momentum
         self.l2 = args.l2
-        self.num_epochs = 100
+        self.num_epochs = args.num_epochs
         self.lr_decay = 0.05
         self.batch_size = 10
         self.use_dev = True
-        self.train_num = -1
-        self.dev_num = -1
-        self.test_num = -1
+        self.train_num = args.train_num
+        self.dev_num = args.dev_num
+        self.test_num = args.test_num
+        self.batch_size = args.batch_size
 
         self.hidden_dim = args.hidden_dim
         self.use_brnn = True
@@ -66,7 +67,7 @@ class Config:
       read all the  pretrain embeddings
     '''
     def read_pretrain_embedding(self):
-        print("reading the pretraing embedding")
+        print("reading the pretraing embedding: %s" % (self.embedding_file))
         if self.embedding_file is None:
             print("pretrain embedding in None, using random embedding")
             return None, self.embedding_dim
@@ -105,6 +106,7 @@ class Config:
             self.word2idx[word] = len(self.word2idx)
             self.idx2word.append(word)
         if self.embedding is not None:
+            print("[Info] Use the pretrained word embedding to initialize")
             self.word_embedding = np.empty([len(self.word2idx), self.embedding_dim])
             for word in self.word2idx:
                 if word in self.embedding:

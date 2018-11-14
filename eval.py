@@ -54,6 +54,6 @@ def evaluate(insts):
 
     precision = p * 1.0 / total_predict * 100 if total_predict != 0 else 0
     recall = p * 1.0 / total_entity * 100 if total_entity != 0 else 0
-    fscore = 2.0 * precision * recall / (precision + recall)
+    fscore = 2.0 * precision * recall / (precision + recall) if precision != 0 or recall != 0 else 0
 
     return [precision, recall, fscore]

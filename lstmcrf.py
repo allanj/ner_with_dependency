@@ -29,7 +29,7 @@ class BiLSTM_CRF:
 
     ## computing the negative loglikelihood
     def build_graph(self, x, is_train):
-        dy.renew_cg()
+        # dy.renew_cg()
         embeddings = [self.word_embedding[self.word2idx[w]] for w in x]
         if not is_train:
             self.bilstm.disable_dropout()
@@ -118,7 +118,7 @@ class BiLSTM_CRF:
         features = self.build_graph(x, False)
         best_path, path_score = self.viterbi_decoding(features)
         best_path = [self.labels[x] for x in best_path]
-        print(best_path)
+        # print(best_path)
         # print('path_score:', path_score.value())
         return best_path
 
