@@ -54,7 +54,7 @@ class Config:
         self.eval_freq = args.eval_freq
 
         self.hidden_dim = args.hidden_dim
-        self.tanh_hidden_dim = args.tanh_hidden_dim
+        # self.tanh_hidden_dim = args.tanh_hidden_dim
         self.use_brnn = True
         self.num_layers = 1
         self.dropout = args.dropout
@@ -117,19 +117,19 @@ class Config:
         for word in train_vocab:
             self.word2idx[word] = len(self.word2idx)
             self.idx2word.append(word)
-            for c in word:
-                if c not in self.char2idx:
-                    self.char2idx[c] = len(self.idx2char)
-                    self.idx2char.append(c)
+            # for c in word:
+            #     if c not in self.char2idx:
+            #         self.char2idx[c] = len(self.idx2char)
+            #         self.idx2char.append(c)
 
         for word in test_vocab:
             if word not in self.word2idx:
                 self.word2idx[word] = len(self.word2idx)
                 self.idx2word.append(word)
-                for c in word:
-                    if c not in self.char2idx:
-                        self.char2idx[c] = len(self.idx2char)
-                        self.idx2char.append(c)
+                # for c in word:
+                #     if c not in self.char2idx:
+                #         self.char2idx[c] = len(self.idx2char)
+                #         self.idx2char.append(c)
         self.num_char = len(self.idx2char)
         # for word in test_vocab:
         #     if word not in train_vocab:
@@ -146,8 +146,8 @@ class Config:
                 elif word.lower() in self.embedding:
                     self.word_embedding[self.word2idx[word], :] = self.embedding[word.lower()]
                 else:
-                    # self.word_embedding[self.word2idx[word], :] = self.embedding[self.unk]
-                    self.word_embedding[self.word2idx[word], :] = np.random.uniform(-scale, scale, [1, self.embedding_dim])
+                    self.word_embedding[self.word2idx[word], :] = self.embedding[self.unk]
+                    # self.word_embedding[self.word2idx[word], :] = np.random.uniform(-scale, scale, [1, self.embedding_dim])
             self.embedding = None
         else:
             self.word_embedding = np.empty([len(self.word2idx), self.embedding_dim])
