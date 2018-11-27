@@ -12,10 +12,11 @@ class Reader:
 
     def __init__(self, digit2zero):
         self.digit2zero = digit2zero
-        self.all_vocab = set()
+        self.train_vocab = set()
+        self.test_vocab = set()
 
 
-    def read_from_file(self, file, number=-1):
+    def read_from_file(self, file, number=-1, is_train=True):
         print("Reading file: " + file)
         insts = []
         # vocab = set() ## build the vocabulary
@@ -35,7 +36,10 @@ class Reader:
                 if self.digit2zero:
                     word = re.sub('\d', '0', word)
                 words.append(word)
-                self.all_vocab.add(word)
+                if is_train:
+                    self.train_vocab.add(word)
+                else:
+                    self.test_vocab.add(word)
                 labels.append(label)
         return insts
 

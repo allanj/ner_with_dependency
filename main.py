@@ -1,6 +1,7 @@
 
 
 
+
 def setSeed(seed):
     random.seed(seed)
     np.random.seed(seed)
@@ -14,22 +15,27 @@ def parse_arguments(parser):
     parser.add_argument('--train_file', type=str, default="data/conll2003/train.txt")
     parser.add_argument('--dev_file', type=str, default="data/conll2003/dev.txt")
     parser.add_argument('--test_file', type=str, default="data/conll2003/test.txt")
-    # parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
-    parser.add_argument('--embedding_file', type=str, default=None)
+    parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
+    # parser.add_argument('--embedding_file', type=str, default=None)
     parser.add_argument('--embedding_dim', type=int, default=100)
     parser.add_argument('--optimizer', type=str, default="sgd")
-    parser.add_argument('--learning_rate', type=float, default=0.015)
+    parser.add_argument('--learning_rate', type=float, default=0.05)
     parser.add_argument('--momentum', type=float, default=0.0)
     parser.add_argument('--l2', type=float, default=0.0)
     parser.add_argument('--batch_size', type=int, default=1)
     parser.add_argument('--num_epochs', type=int, default=100)
 
     ##model hyperparameter
-    parser.add_argument('--hidden_dim', type=int, default=100)
+    parser.add_argument('--hidden_dim', type=int, default=200)
+    parser.add_argument('--dropout', type=float, default=0.5)
+    parser.add_argument('--tanh_hidden_dim', type=int, default=100)
+    parser.add_argument('--use_char_rnn', type=bool, default=False)
 
     parser.add_argument('--train_num', type=int, default=100)
     parser.add_argument('--dev_num', type=int, default=100)
     parser.add_argument('--test_num', type=int, default=100)
+    parser.add_argument('--eval_freq', type=int, default=2000)
+
 
     return parser.parse_args()
 
@@ -47,10 +53,17 @@ def batching(insts, batch_size):
         batch_insts.append(one_batch)
     return batch_insts
 
+def get_optimizer(model):
+
+    if config.optimizer == "sgd":
+        return dy.SimpleSGDTrainer(model, learning_rate=config.learning_rate)
+    elif config.optimizer == "adam":
+        return dy.AdamTrainer(model)
+
 def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
 
     model = dy.ParameterCollection()
-    trainer = dy.SimpleSGDTrainer(model, learning_rate=config.learning_rate)
+    trainer = get_optimizer(model)
 
     bicrf = BiLSTM_CRF(config, model)
     trainer.set_clip_threshold(5)
@@ -67,7 +80,9 @@ def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
                 dy.renew_cg()
                 losses = []
                 for inst in minibatch:
-                    loss = bicrf.negative_log(inst.input.words, inst.output)
+                    input = inst.input.word_ids
+                    # input = config.insert_singletons(inst.input.word_ids)
+                    loss = bicrf.negative_log(input, inst.output)
                     loss_value = loss.value()
                     losses.append(loss)
                     epoch_loss += loss_value
@@ -76,40 +91,54 @@ def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
                 loss.backward()
                 trainer.update()
         else:
+            k = 0
             for inst in insts:
             # for inst in tqdm(insts):
                 dy.renew_cg()
-                loss = bicrf.negative_log(inst.input.words, inst.output)
+                input = inst.input.word_ids
+                # input = config.insert_singletons(inst.input.word_ids)
+                loss = bicrf.negative_log(input, inst.output, x_chars=inst.input.char_ids)
                 loss_value = loss.value()
                 loss.backward()
                 trainer.update()
                 epoch_loss += loss_value
-        print("Epoch %d: %.5f" % (i + 1, epoch_loss))
-        ## evaluation
-        for dev_inst in dev_insts:
-            dy.renew_cg()
-            dev_inst.prediction =  bicrf.decode(dev_inst.input.words)
-        metrics = eval.evaluate(dev_insts)
-        # print("precision "+str(metrics[0]) + " recall:" +str(metrics[1])+" f score : " + str(metrics[2]))
+                k = k + 1
 
-        print("[Dev set] Precision: %.2f, Recall: %.2f, F1: %.2f" % (metrics[0], metrics[1], metrics[2]))
-        if metrics[2] > best_dev[0]:
-            best_dev[0] = metrics[2]
-            best_dev[1] = i
-        ## evaluation
-        for test_inst in test_insts:
-            dy.renew_cg()
-            test_inst.prediction = bicrf.decode(test_inst.input.words)
-        metrics = eval.evaluate(test_insts)
-        print("[Test set] Precision: %.2f, Recall: %.2f, F1: %.2f" % (metrics[0], metrics[1], metrics[2]))
-        if metrics[2] > best_test[0]:
-            best_test[0] = metrics[2]
-            best_test[1] = i
-
+                if k % config.eval_freq == 0 or k == len(insts) :
+                    dev_metrics, test_metrics = evaluate(bicrf, dev_insts, test_insts)
+                    if dev_metrics[2] > best_dev[0]:
+                        best_dev[0] = dev_metrics[2]
+                        best_dev[1] = i
+                    if test_metrics[2] > best_test[0]:
+                        best_test[0] = test_metrics[2]
+                        best_test[1] = i
+                    k = 0
+        print("Epoch %d: %.5f" % (i + 1, epoch_loss), flush=True)
     print("The best dev: %.2f" % (best_dev[0]))
     print("The best test: %.2f" % (best_test[0]))
 
+def evaluate(model, dev_insts, test_insts):
+    ## evaluation
+    for dev_inst in dev_insts:
+        dy.renew_cg()
+        dev_inst.prediction = model.decode(dev_inst.input.word_ids, dev_inst.input.char_ids)
+    dev_metrics = eval.evaluate(dev_insts)
+    # print("precision "+str(metrics[0]) + " recall:" +str(metrics[1])+" f score : " + str(metrics[2]))
+    print("[Dev set] Precision: %.2f, Recall: %.2f, F1: %.2f" % (dev_metrics[0], dev_metrics[1], dev_metrics[2]))
+    ## evaluation
+    for test_inst in test_insts:
+        dy.renew_cg()
+        test_inst.prediction = model.decode(test_inst.input.word_ids, test_inst.input.char_ids)
+    test_metrics = eval.evaluate(test_insts)
+    print("[Test set] Precision: %.2f, Recall: %.2f, F1: %.2f" % (test_metrics[0], test_metrics[1], test_metrics[2]))
+    return dev_metrics, test_metrics
+
 if __name__ == "__main__":
+
+    import dynet_config
+
+    dynet_config.set(mem=512, random_seed=1234, autobatch=False)
+
     import argparse
     import random
     import numpy as np
@@ -124,37 +153,34 @@ if __name__ == "__main__":
     opt = parse_arguments(parser)
     config = Config(opt)
 
-    import dynet_config
 
-    # dynet_config.set_gpu()
-    # Set some parameters manualy
-    dynet_config.set(mem=512, random_seed=1234, autobatch=config.batch_size!=1)
     import dynet as dy
 
 
-    # dyparams = dy.DynetParams()
-    # dyparams.set_autobatch(config.batch_size != 1)
-    # dyparams.set_mem(2048)
     reader = Reader(config.digit2zero)
     setSeed(config.seed)
 
-    # dyparams.init()
-
-    train_insts = reader.read_from_file(config.train_file, config.train_num)
-    dev_insts = reader.read_from_file(config.dev_file, config.dev_num)
-    test_insts = reader.read_from_file(config.test_file, config.test_num)
-    # print("All vocabulary")
-    # print(reader.all_vocab)
-
-    config.build_emb_table(reader.all_vocab)
+    train_insts = reader.read_from_file(config.train_file, config.train_num, True)
+    dev_insts = reader.read_from_file(config.dev_file, config.dev_num, False)
+    test_insts = reader.read_from_file(config.test_file, config.test_num, False)
 
     config.use_iobes(train_insts)
     config.use_iobes(dev_insts)
     config.use_iobes(test_insts)
     config.build_label_idx(train_insts)
-    config.build_char_idx(train_insts)
-    config.build_char_idx(dev_insts)
-    config.build_char_idx(test_insts)
+    # print("All vocabulary")
+    # print(reader.all_vocab)
+
+
+
+    config.build_emb_table(reader.train_vocab, reader.test_vocab)
+
+    config.find_singleton(train_insts)
+    config.map_insts_ids(train_insts)
+    config.map_insts_ids(dev_insts)
+    config.map_insts_ids(test_insts)
+
+
 
     print("num chars: " + str(config.num_char))
     # print(str(config.char2idx))

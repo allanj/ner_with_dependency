@@ -19,6 +19,8 @@ class Config:
         self.O = "O"
         self.START_TAG = "<START>"
         self.STOP_TAG = "<STOP>"
+        self.unk = "unk"
+        self.unk_id = -1
 
         # self.device = torch.device("cuda" if args.gpu else "cpu")
         self.embedding_file = args.embedding_file
@@ -42,22 +44,23 @@ class Config:
         self.momentum = args.momentum
         self.l2 = args.l2
         self.num_epochs = args.num_epochs
-        self.lr_decay = 0.05
+        # self.lr_decay = 0.05
         self.batch_size = 10
         self.use_dev = True
         self.train_num = args.train_num
         self.dev_num = args.dev_num
         self.test_num = args.test_num
         self.batch_size = args.batch_size
+        self.eval_freq = args.eval_freq
 
         self.hidden_dim = args.hidden_dim
+        self.tanh_hidden_dim = args.tanh_hidden_dim
         self.use_brnn = True
         self.num_layers = 1
-        self.dropout_bilstm = 0.5
+        self.dropout = args.dropout
         self.char_emb_size = 25
-        self.char_hidden_dim = 50
-        self.use_char = False
-        self.emb_dropout = 0.5
+        self.charlstm_hidden_dim = 50
+        self.use_char_rnn = args.use_char_rnn
 
     # def print(self):
     #     print("")
@@ -82,6 +85,8 @@ class Config:
                 if embedding_dim < 0:
                     embedding_dim = len(tokens) - 1
                 else:
+                    # print(tokens)
+                    # print(embedding_dim)
                     assert (embedding_dim + 1 == len(tokens))
                 embedd = np.empty([1, embedding_dim])
                 embedd[:] = tokens[1:]
@@ -94,7 +99,7 @@ class Config:
         build the embedding table
         obtain the word2idx and idx2word as well.
     '''
-    def build_emb_table(self, vocab):
+    def build_emb_table(self, train_vocab, test_vocab):
         print("Building the embedding table for vocabulary...")
         scale = np.sqrt(3.0 / self.embedding_dim)
 
@@ -102,11 +107,38 @@ class Config:
         self.idx2word = []
         self.word2idx[self.PAD] = 0
         self.idx2word.append(self.PAD)
-        for word in vocab:
+        self.word2idx[self.unk] = 1
+        self.unk_id = 1
+        self.idx2word.append(self.unk)
+
+        self.char2idx[self.unk] = 0
+        self.idx2char.append(self.unk)
+
+        for word in train_vocab:
             self.word2idx[word] = len(self.word2idx)
             self.idx2word.append(word)
+            for c in word:
+                if c not in self.char2idx:
+                    self.char2idx[c] = len(self.idx2char)
+                    self.idx2char.append(c)
+
+        for word in test_vocab:
+            if word not in self.word2idx:
+                self.word2idx[word] = len(self.word2idx)
+                self.idx2word.append(word)
+                for c in word:
+                    if c not in self.char2idx:
+                        self.char2idx[c] = len(self.idx2char)
+                        self.idx2char.append(c)
+        self.num_char = len(self.idx2char)
+        # for word in test_vocab:
+        #     if word not in train_vocab:
+        #         if word in self.embedding or word.lower() in self.embedding:
+        #             self.word2idx[word] = len(self.word2idx)
+        #             self.idx2word.append(word)
+
         if self.embedding is not None:
-            print("[Info] Use the pretrained word embedding to initialize")
+            print("[Info] Use the pretrained word embedding to initialize: %d x %d" % (len(self.word2idx), self.embedding_dim))
             self.word_embedding = np.empty([len(self.word2idx), self.embedding_dim])
             for word in self.word2idx:
                 if word in self.embedding:
@@ -114,6 +146,7 @@ class Config:
                 elif word.lower() in self.embedding:
                     self.word_embedding[self.word2idx[word], :] = self.embedding[word.lower()]
                 else:
+                    # self.word_embedding[self.word2idx[word], :] = self.embedding[self.unk]
                     self.word_embedding[self.word2idx[word], :] = np.random.uniform(-scale, scale, [1, self.embedding_dim])
             self.embedding = None
         else:
@@ -139,18 +172,6 @@ class Config:
         print("#labels: " + str(self.label_size))
         print("label 2idx: " + str(self.label2idx))
 
-    def build_char_idx(self, insts):
-        self.char2idx[self.PAD] = 0
-        self.idx2char.append(self.PAD)
-        for inst in insts:
-            for word in inst.input.words:
-                for c in word:
-                    if c not in self.char2idx:
-                        self.char2idx[c] = len(self.idx2char)
-                        self.idx2char.append(c)
-        self.num_char = len(self.char2idx)
-        # print("#curr char: " + str(self.num_char))
-
     def use_iobes(self, insts):
         for inst in insts:
             output = inst.output
@@ -170,26 +191,61 @@ class Config:
                         if next_entity.startswith(self.O) or next_entity.startswith(self.B):
                             output[pos] = curr_entity.replace(self.I, self.E)
 
-
     def map_insts_ids(self, insts):
-        insts_ids = []
-
-        word_ids = []
-        char_ids = []
-        label_ids = []
         for inst in insts:
             words = inst.input.words
-            output = inst.output
+            inst.input.word_ids = []
+            inst.input.char_ids = []
             for word in words:
-                word_ids.append(self.word2idx[word])
+                if word in self.word2idx:
+                    inst.input.word_ids.append(self.word2idx[word])
+                else:
+                    inst.input.word_ids.append(self.word2idx[self.unk])
                 char_id = []
                 for c in word:
-                    char_id.append(self.char2idx[c])
-                char_ids.append(char_id)
-            for label in output:
-                label_ids.append(self.label2idx[label])
-            insts_ids.append([word_ids, char_ids, label_ids])
-            word_ids = []
-            char_ids = []
-            label_ids = []
-        return insts_ids
+                    if c in self.char2idx:
+                        char_id.append(self.char2idx[c])
+                    else:
+                        char_id.append(self.char2idx[self.unk])
+                inst.input.char_ids.append(char_id)
+        #     for label in output:
+        #         label_ids.append(self.label2idx[label])
+        #     insts_ids.append([word_ids, char_ids, label_ids])
+        #     word_ids = []
+        #     char_ids = []
+        #     label_ids = []
+        # return insts_ids
+
+
+    # def map_word_to_ids_in_insts(self, insts):
+    #     for inst in insts:
+    #         words = inst.input.words
+    #         inst.input_ids = []
+    #         for word in words:
+    #             inst.input_ids.append(self.word2idx[word])
+
+    def find_singleton(self, train_insts):
+        freq = {}
+        self.singleton = set()
+        for inst in train_insts:
+            words = inst.input.words
+            for w in words:
+                if w in freq:
+                    freq[w] += 1
+                else:
+                    freq[w] = 1
+        for w in freq:
+            if freq[w] == 1:
+                self.singleton.add(self.word2idx[w])
+
+    def insert_singletons(self, words, p=0.5):
+        """
+        Replace singletons by the unknown word with a probability p.
+        """
+        new_words = []
+        for word in words:
+            if word in self.singleton and np.random.uniform() < p:
+                new_words.append(self.unk_id)
+            else:
+                new_words.append(word)
+        return new_words

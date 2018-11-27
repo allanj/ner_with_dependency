@@ -13,3 +13,6 @@ def log_sum_exp(scores, num_labels):
     Please use sum_dim(x, [1]) instead.
     '''
     return max_score_expr + dy.log(dy.sum_dim(dy.exp(scores - max_score_expr_broadcast), [0]))
+
+
+
