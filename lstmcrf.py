@@ -111,8 +111,8 @@ class BiLSTM_CRF:
         return labeled_score
 
     def negative_log(self, x, y, x_chars=None):
-        # features = self.build_graph(x, True) if not self.use_char_rnn else self.build_graph_with_char(x,x_chars,True)
-        features = self.build_graph(x, True)
+        features = self.build_graph(x, True) if not self.use_char_rnn else self.build_graph_with_char(x,x_chars,True)
+        # features = self.build_graph(x, True)
         unlabed_score = self.forward_unlabeled(features)
         labeled_score = self.forward_labeled(features, y)
         return unlabed_score - labeled_score
@@ -152,8 +152,8 @@ class BiLSTM_CRF:
         return best_path, path_score
 
     def decode(self, x, x_chars=None):
-        # features = self.build_graph(x, False) if not self.use_char_rnn else self.build_graph_with_char(x,x_chars,False)
-        features = self.build_graph(x, False)
+        features = self.build_graph(x, False) if not self.use_char_rnn else self.build_graph_with_char(x,x_chars,False)
+        # features = self.build_graph(x, False)
         best_path, path_score = self.viterbi_decoding(features)
         best_path = [self.labels[x] for x in best_path]
         # print(best_path)

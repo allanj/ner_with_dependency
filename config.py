@@ -117,25 +117,20 @@ class Config:
         for word in train_vocab:
             self.word2idx[word] = len(self.word2idx)
             self.idx2word.append(word)
-            # for c in word:
-            #     if c not in self.char2idx:
-            #         self.char2idx[c] = len(self.idx2char)
-            #         self.idx2char.append(c)
+            for c in word:
+                if c not in self.char2idx:
+                    self.char2idx[c] = len(self.idx2char)
+                    self.idx2char.append(c)
 
         for word in test_vocab:
             if word not in self.word2idx:
                 self.word2idx[word] = len(self.word2idx)
                 self.idx2word.append(word)
-                # for c in word:
-                #     if c not in self.char2idx:
-                #         self.char2idx[c] = len(self.idx2char)
-                #         self.idx2char.append(c)
+                for c in word:
+                    if c not in self.char2idx:
+                        self.char2idx[c] = len(self.idx2char)
+                        self.idx2char.append(c)
         self.num_char = len(self.idx2char)
-        # for word in test_vocab:
-        #     if word not in train_vocab:
-        #         if word in self.embedding or word.lower() in self.embedding:
-        #             self.word2idx[word] = len(self.word2idx)
-        #             self.idx2word.append(word)
 
         if self.embedding is not None:
             print("[Info] Use the pretrained word embedding to initialize: %d x %d" % (len(self.word2idx), self.embedding_dim))
