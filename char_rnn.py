@@ -17,7 +17,7 @@ class CharRNN:
         print("char embedding size: %d" % (self.char_emb_size))
         print("char hidden size: %d" % (config.charlstm_hidden_dim))
 
-    def foward_char(self, x):
+    def forward_char(self, x):
         embeddings = [self.char_emb[c] for c in x]
         fw_state = self.fw_lstm.initial_state()
         bw_state = self.bw_lstm.initial_state()

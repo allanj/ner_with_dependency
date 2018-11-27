@@ -47,7 +47,7 @@ class BiLSTM_CRF:
             embeddings = []
             for w,chars in zip(x, all_chars):
                 word_emb = self.word_embedding[w]
-                f, b = self.char_rnn.foward_char(chars)
+                f, b = self.char_rnn.forward_char(chars)
                 concat = dy.concatenate([word_emb, f, b])
                 embeddings.append(dy.dropout(concat, self.dropout))
 
