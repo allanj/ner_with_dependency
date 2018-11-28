@@ -77,6 +77,7 @@ def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
         batch_insts = batching(insts, batch_size)
     for i in range(epoch):
         epoch_loss = 0
+        start_time = time.time()
         if batch_size != 1:
             for minibatch in tqdm(batch_insts):
                 dy.renew_cg()
@@ -115,7 +116,8 @@ def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
                         best_test[0] = test_metrics[2]
                         best_test[1] = i
                     k = 0
-        print("Epoch %d: %.5f" % (i + 1, epoch_loss), flush=True)
+            end_time = time.time()
+        print("Epoch %d: %.5f, Time is %.2fs" % (i + 1, epoch_loss, end_time-start_time), flush=True)
     print("The best dev: %.2f" % (best_dev[0]))
     print("The best test: %.2f" % (best_test[0]))
 
@@ -150,6 +152,7 @@ if __name__ == "__main__":
     import eval
     from tqdm import tqdm
     import math
+    import time
 
     parser = argparse.ArgumentParser(description="LSTM CRF implementation")
     opt = parse_arguments(parser)
