@@ -23,13 +23,13 @@ def parse_arguments(parser):
     parser.add_argument('--momentum', type=float, default=0.0)
     parser.add_argument('--l2', type=float, default=0.0)
     parser.add_argument('--batch_size', type=int, default=1)
-    parser.add_argument('--num_epochs', type=int, default=20)
+    parser.add_argument('--num_epochs', type=int, default=30)
 
     ##model hyperparameter
-    parser.add_argument('--hidden_dim', type=int, default=200)
+    parser.add_argument('--hidden_dim', type=int, default=100)
     parser.add_argument('--dropout', type=float, default=0.5)
     # parser.add_argument('--tanh_hidden_dim', type=int, default=100)
-    parser.add_argument('--use_char_rnn', type=bool, default=False)
+    parser.add_argument('--use_char_rnn', type=bool, default=True)
 
     parser.add_argument('--train_num', type=int, default=-1)
     parser.add_argument('--dev_num', type=int, default=-1)
