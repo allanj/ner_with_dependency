@@ -51,9 +51,6 @@ class BiLSTM_CRF:
                 concat = dy.concatenate([word_emb, f, b])
                 embeddings.append(dy.dropout(concat, self.dropout))
 
-            # embeddings = [dy.dropout(dy.concatenate(
-            #     [self.word_embedding[w], self.char_rnn.foward_char(chars)[0], self.char_rnn.foward_char(chars)[1]]), self.dropout)
-            #               for w,chars in zip(x,all_chars)]
         else:
             embeddings = []
             for w, chars in zip(x, all_chars):
@@ -61,10 +58,6 @@ class BiLSTM_CRF:
                 f, b = self.char_rnn.forward_char(chars)
                 concat = dy.concatenate([word_emb, f, b])
                 embeddings.append(concat)
-            # embeddings = [dy.dropout(dy.concatenate(
-            #     [self.word_embedding[w], self.char_rnn.foward_char(chars)[0], self.char_rnn.foward_char(chars)[1]]),
-            #                          self.dropout)
-            #               for w, chars in zip(x, all_chars)]
         lstm_out = self.bilstm.transduce(embeddings)
         # tanh_feats = [dy.tanh(dy.affine_transform([self.tanh_bias, self.tanh_w, rep])) for rep in lstm_out]
         features = [dy.affine_transform([self.linear_bias, self.linear_w, rep]) for rep in lstm_out]
