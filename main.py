@@ -15,7 +15,7 @@ def parse_arguments(parser):
     parser.add_argument('--train_file', type=str, default="data/conll2003/train.txt")
     parser.add_argument('--dev_file', type=str, default="data/conll2003/dev.txt")
     parser.add_argument('--test_file', type=str, default="data/conll2003/test.txt")
-    parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
+    # parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
     # parser.add_argument('--embedding_file', type=str, default=None)
     parser.add_argument('--embedding_dim', type=int, default=100)
     parser.add_argument('--optimizer', type=str, default="adam")
@@ -41,20 +41,6 @@ def parse_arguments(parser):
         print(k + ": " + str(args.__dict__[k]))
     return args
 
-def batching(insts, batch_size):
-    num_batchs = math.ceil(len(insts) / batch_size) ## Up round to the num batches
-    batch_insts = []
-    print("batching for %d batches. " % (num_batchs))
-    for i in range(num_batchs):
-        one_batch = []
-
-        end = (i + 1) * batch_size if i != num_batchs - 1 else len(insts)
-        # print("start %d, end  %d" % (i * batch_size, end))
-        for k in range(i * batch_size, end):
-            one_batch.append(insts[k])
-        batch_insts.append(one_batch)
-    return batch_insts
-
 def get_optimizer(model):
 
     if config.optimizer == "sgd":
@@ -73,30 +59,32 @@ def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
 
     best_dev = [-1, 0]
     best_test = [-1, 0]
-    if batch_size != 1:
-        batch_insts = batching(insts, batch_size)
+    # if batch_size != 1:
+    #     batch_insts = batching(insts, batch_size)
     for i in range(epoch):
         epoch_loss = 0
         start_time = time.time()
         if batch_size != 1:
-            for minibatch in tqdm(batch_insts):
+            index = 0
+            while index < len(insts):
+                minibatch = insts[index:(index+batch_size)]
                 dy.renew_cg()
                 losses = []
                 for inst in minibatch:
                     input = inst.input.word_ids
                     # input = config.insert_singletons(inst.input.word_ids)
-                    loss = bicrf.negative_log(input, inst.output)
-                    loss_value = loss.value()
+                    loss = bicrf.negative_log(input, inst.output, x_chars=inst.input.char_ids)
                     losses.append(loss)
-                    epoch_loss += loss_value
-                loss = dy.esum(losses)
-                loss.forward()
-                loss.backward()
+                final_loss = dy.esum(losses)/len(minibatch)
+                loss_value = final_loss.value()
+                epoch_loss += loss_value
+                final_loss.backward()
                 trainer.update()
+                index += batch_size
+            end_time = time.time()
         else:
             k = 0
             for inst in insts:
-            # for inst in tqdm(insts):
                 dy.renew_cg()
                 input = inst.input.word_ids
                 # input = config.insert_singletons(inst.input.word_ids)
@@ -141,7 +129,7 @@ if __name__ == "__main__":
 
     import dynet_config
 
-    dynet_config.set(mem=512, random_seed=1234, autobatch=False)
+    dynet_config.set(mem=1024, random_seed=1234, autobatch=False)
 
     import argparse
     import random
