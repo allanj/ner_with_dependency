@@ -92,13 +92,11 @@ class BiLSTM_CRF:
 
     # Labeled network score
     def forward_labeled(self, features, tags):
-        score_seq = [0]
         score = dy.scalarInput(0)
         tags = [self.label2idx[w] for w in tags]
         tags = [self.label2idx[START]] + tags
         for i, obs in enumerate(features):
             score = score + dy.pick(self.transition[tags[i + 1]], tags[i]) + dy.pick(obs, tags[i + 1])
-            score_seq.append(score.value())
         labeled_score = score + dy.pick(self.transition[self.label2idx[STOP]], tags[-1])
 
         return labeled_score

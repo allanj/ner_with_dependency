@@ -12,8 +12,8 @@ class Reader:
 
     def __init__(self, digit2zero):
         self.digit2zero = digit2zero
-        self.train_vocab = set()
-        self.test_vocab = set()
+        self.train_vocab = {}
+        self.test_vocab = {}
 
 
     def read_from_file(self, file, number=-1, is_train=True):
@@ -37,9 +37,9 @@ class Reader:
                     word = re.sub('\d', '0', word)
                 words.append(word)
                 if is_train:
-                    self.train_vocab.add(word)
+                    self.train_vocab[word]=0
                 else:
-                    self.test_vocab.add(word)
+                    self.test_vocab[word]=0
                 labels.append(label)
         return insts
 

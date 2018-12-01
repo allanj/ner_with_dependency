@@ -1,13 +1,33 @@
 
-
+import argparse
+import random
+import numpy as np
+from config import Config
+from reader import Reader
+from lstmcrf import BiLSTM_CRF
+import eval
+# from tqdm import tqdm
+# import math
+import time
+import dynet as dy
 
 
 def setSeed(seed):
     random.seed(seed)
     np.random.seed(seed)
-    # dy_param.set_random_seed(seed)
 
 def parse_arguments(parser):
+    dynet_args = [
+        "--dynet-mem",
+        "--dynet-weight-decay",
+        "--dynet-autobatch",
+        "--dynet-gpus",
+        "--dynet-gpu",
+        "--dynet-devices",
+        "--dynet-seed",
+    ]
+    for arg in dynet_args:
+        parser.add_argument(arg)
     parser.add_argument('--mode', type=str, default='train')
     parser.add_argument('--gpu', action="store_true", default=False)
     parser.add_argument('--seed', type=int, default=1234)
@@ -15,7 +35,7 @@ def parse_arguments(parser):
     parser.add_argument('--train_file', type=str, default="data/conll2003/train.txt")
     parser.add_argument('--dev_file', type=str, default="data/conll2003/dev.txt")
     parser.add_argument('--test_file', type=str, default="data/conll2003/test.txt")
-    # parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
+    parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
     # parser.add_argument('--embedding_file', type=str, default=None)
     parser.add_argument('--embedding_dim', type=int, default=100)
     parser.add_argument('--optimizer', type=str, default="adam")
@@ -127,28 +147,11 @@ def evaluate(model, dev_insts, test_insts):
 
 if __name__ == "__main__":
 
-    import dynet_config
 
-    dynet_config.set(mem=1024, random_seed=1234, autobatch=False)
-
-    import argparse
-    import random
-    import numpy as np
-    from config import Config
-    from reader import Reader
-    from lstmcrf import BiLSTM_CRF
-    import eval
-    from tqdm import tqdm
-    import math
-    import time
 
     parser = argparse.ArgumentParser(description="LSTM CRF implementation")
     opt = parse_arguments(parser)
     config = Config(opt)
-
-
-    import dynet as dy
-
 
     reader = Reader(config.digit2zero)
     setSeed(config.seed)
@@ -161,9 +164,6 @@ if __name__ == "__main__":
     config.use_iobes(dev_insts)
     config.use_iobes(test_insts)
     config.build_label_idx(train_insts)
-    # print("All vocabulary")
-    # print(reader.all_vocab)
-
 
 
     config.build_emb_table(reader.train_vocab, reader.test_vocab)

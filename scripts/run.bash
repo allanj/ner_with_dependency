@@ -1,6 +1,16 @@
 #!/bin/bash
 
+#autobatch=1
+#--dynet-autobatch
+optimizer=adam
+#lr=1
+batch=1
+seed=42
+#gpu=1
 
-python3 main.py --train_num -1 --dev_num -1 --test_num -1 --batch_size 1 --eval_freq 4000 --dropout 0.5 --optimizer adam --num_epochs 30 > logs/log 2>&1 
+python3 main.py --dynet-seed ${seed} --optimizer ${optimizer} \
+          --batch_size ${batch} --dynet-mem 4096 \
+          --dynet-devices GPU:0 > logs/conll2003_complete.log 2>&1
+
 
 

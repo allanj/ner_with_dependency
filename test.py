@@ -15,24 +15,24 @@
 # assert x == 3
 
 
-import numpy as np
-# Note: please import dynet_config before import dynet
-import dynet_config
-# set random seed to have the same result each time
-dynet_config.set(random_seed=0)
-import dynet as dy
-
-x = dy.inputTensor(np.random.rand(10,10,1))
-model = dy.Model()
+# import numpy as np
+# # Note: please import dynet_config before import dynet
+# import dynet_config
+# # set random seed to have the same result each time
+# dynet_config.set(random_seed=0)
+# import dynet as dy
 #
-W = model.add_parameters((5, 5, 1, 10))
-b = model.add_parameters((10,1))
-q = model.add_parameters((10, 1))
-q2 = model.add_parameters((10))
-print(b.dim())
-print(q.dim())
-print(q2.dim()[0][0])
-convds = dy.conv2d_bias(x, W, b, stride=(1,1))
+# x = dy.inputTensor(np.random.rand(10,10,1))
+# model = dy.Model()
+# #
+# W = model.add_parameters((5, 5, 1, 10))
+# b = model.add_parameters((10,1))
+# q = model.add_parameters((10, 1))
+# q2 = model.add_parameters((10))
+# print(b.dim())
+# print(q.dim())
+# print(q2.dim()[0][0])
+# convds = dy.conv2d_bias(x, W, b, stride=(1,1))
 #
 # print(convds.value())
 # print(convds.dim())
@@ -70,3 +70,10 @@ convds = dy.conv2d_bias(x, W, b, stride=(1,1))
 # print(x.dim()[0])
 
 
+a = {}
+a["b"]=0
+a["sdgf"]=0
+a["BB"]=0
+a["a"]=0
+for x in a:
+    print(x)
