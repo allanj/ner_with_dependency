@@ -134,7 +134,7 @@ class Config:
                         self.char2idx[c] = len(self.idx2char)
                         self.idx2char.append(c)
         self.num_char = len(self.idx2char)
-        print(self.word2idx)
+        # print(self.word2idx)
         print(self.char2idx)
 
         if self.embedding is not None:
