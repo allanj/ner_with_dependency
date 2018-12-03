@@ -40,6 +40,12 @@ class BiLSTM_CRF:
 
         self.dropout = config.dropout
 
+    def save_shared_parameters(self):
+        print("Saving the encoder parameter")
+        # self.word_embedding.save("models/word_embedding.m")
+        dy.save("basename", [self.char_rnn.char_emb, self.char_rnn.fw_lstm, self.char_rnn.bw_lstm,
+                               self.word_embedding, self.bilstm])
+
     def build_graph_with_char(self, x, all_chars, is_train):
 
 

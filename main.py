@@ -30,7 +30,7 @@ def parse_arguments(parser):
         parser.add_argument(arg)
     parser.add_argument('--mode', type=str, default='train')
     parser.add_argument('--gpu', action="store_true", default=False)
-    parser.add_argument('--seed', type=int, default=1234)
+    parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--digit2zero', action="store_true", default=True)
     parser.add_argument('--train_file', type=str, default="data/conll2003/train.txt")
     parser.add_argument('--dev_file', type=str, default="data/conll2003/dev.txt")
@@ -46,15 +46,18 @@ def parse_arguments(parser):
     parser.add_argument('--num_epochs', type=int, default=30)
 
     ##model hyperparameter
-    parser.add_argument('--hidden_dim', type=int, default=100)
-    parser.add_argument('--dropout', type=float, default=0.5)
+    parser.add_argument('--hidden_dim', type=int, default=100, help="hidden size of the LSTM")
+    parser.add_argument('--dropout', type=float, default=0.5, help="dropout for embedding")
     # parser.add_argument('--tanh_hidden_dim', type=int, default=100)
-    parser.add_argument('--use_char_rnn', type=bool, default=True)
+    parser.add_argument('--use_char_rnn', type=bool, default=True, help="use character-level lstm")
 
     parser.add_argument('--train_num', type=int, default=-1)
     parser.add_argument('--dev_num', type=int, default=-1)
     parser.add_argument('--test_num', type=int, default=-1)
-    parser.add_argument('--eval_freq', type=int, default=2000)
+    parser.add_argument('--eval_freq', type=int, default=1000,help="evaluate frequency (iteration)")
+    parser.add_argument('--eval_epoch',type=int, default=5, help="evaluate the dev set after this number of epoch")
+
+    parser.add_argument("--save_param",type=bool,default=False)
 
     args = parser.parse_args()
     for k in args.__dict__:
@@ -81,6 +84,9 @@ def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
     best_test = [-1, 0]
     # if batch_size != 1:
     #     batch_insts = batching(insts, batch_size)
+
+    model_name= "models/lstm_crf_"+str(config.train_num)+".m"
+    print("[Info] The model will be saved to: %s, please ensure models folder exist" % (model_name))
     for i in range(epoch):
         epoch_loss = 0
         start_time = time.time()
@@ -115,11 +121,14 @@ def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
                 epoch_loss += loss_value
                 k = k + 1
 
-                if k % config.eval_freq == 0 or k == len(insts) :
+                if i+1 >= config.eval_epoch and ( k % config.eval_freq == 0 or k == len(insts) ):
                     dev_metrics, test_metrics = evaluate(bicrf, dev_insts, test_insts)
                     if dev_metrics[2] > best_dev[0]:
                         best_dev[0] = dev_metrics[2]
                         best_dev[1] = i
+                        model.save(model_name)
+                        if config.save_param:
+                            bicrf.save_shared_parameters() ##Optional step
                     if test_metrics[2] > best_test[0]:
                         best_test[0] = test_metrics[2]
                         best_test[1] = i
@@ -128,6 +137,10 @@ def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
         print("Epoch %d: %.5f, Time is %.2fs" % (i + 1, epoch_loss, end_time-start_time), flush=True)
     print("The best dev: %.2f" % (best_dev[0]))
     print("The best test: %.2f" % (best_test[0]))
+    # model.populate(model_name)
+    # evaluate(bicrf, dev_insts, test_insts)
+    # if config.save_param:
+    #     bicrf.save_shared_parameters()
 
 def evaluate(model, dev_insts, test_insts):
     ## evaluation

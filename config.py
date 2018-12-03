@@ -62,6 +62,9 @@ class Config:
         self.charlstm_hidden_dim = 50
         self.use_char_rnn = args.use_char_rnn
 
+
+        self.save_param = args.save_param
+        self.eval_epoch = args.eval_epoch
     # def print(self):
     #     print("")
     #     print("\tuse gpu: " + )
@@ -131,6 +134,8 @@ class Config:
                         self.char2idx[c] = len(self.idx2char)
                         self.idx2char.append(c)
         self.num_char = len(self.idx2char)
+        print(self.word2idx)
+        print(self.char2idx)
 
         if self.embedding is not None:
             print("[Info] Use the pretrained word embedding to initialize: %d x %d" % (len(self.word2idx), self.embedding_dim))
@@ -151,8 +156,6 @@ class Config:
 
 
     def build_label_idx(self, insts):
-        self.label2idx[self.PAD] = 0
-        self.idx2labels.append(self.PAD)
         for inst in insts:
             for label in inst.output:
                 if label not in self.label2idx:

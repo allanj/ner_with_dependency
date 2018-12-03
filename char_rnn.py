@@ -9,7 +9,7 @@ class CharRNN:
         self.char_size = len(self.chars)
         self.model = model
         self.char_emb = model.add_lookup_parameters((self.char_size, self.char_emb_size))
-        self.bilstm = dy.BiRNNBuilder(1, self.char_emb_size, config.charlstm_hidden_dim, self.model, dy.LSTMBuilder)
+        # self.bilstm = dy.BiRNNBuilder(1, self.char_emb_size, config.charlstm_hidden_dim, self.model, dy.LSTMBuilder)
 
         self.fw_lstm = dy.CompactVanillaLSTMBuilder(1, self.char_emb_size, config.charlstm_hidden_dim/2, self.model)
         self.bw_lstm = dy.CompactVanillaLSTMBuilder(1, self.char_emb_size, config.charlstm_hidden_dim/2, self.model)

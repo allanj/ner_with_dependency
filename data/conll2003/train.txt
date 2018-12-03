@@ -22996,8 +22996,6 @@ Aug NNP O
 research NN O
 . . O
 
-Company-------------Price---Broker---------------- NNP O
-
 Aegon NNP B-ORG
 83.40 CD O
 Paribas NNP B-ORG
@@ -38272,8 +38270,6 @@ per IN O
 share NN O
 ) ) O
 : : O
-
-DAY--COMPANY----PERIOD--CONSENSUS----RANGE-------PVS NNP O
 
 MON NN O
 Gencor NNP B-ORG
