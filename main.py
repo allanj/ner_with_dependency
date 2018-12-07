@@ -55,7 +55,7 @@ def parse_arguments(parser):
     parser.add_argument('--dev_num', type=int, default=-1)
     parser.add_argument('--test_num', type=int, default=-1)
     parser.add_argument('--eval_freq', type=int, default=1000,help="evaluate frequency (iteration)")
-    parser.add_argument('--eval_epoch',type=int, default=5, help="evaluate the dev set after this number of epoch")
+    parser.add_argument('--eval_epoch',type=int, default=0, help="evaluate the dev set after this number of epoch")
 
     parser.add_argument("--save_param",type=bool,default=False)
 
@@ -110,7 +110,8 @@ def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
             end_time = time.time()
         else:
             k = 0
-            for inst in insts:
+            for index in np.random.permutation(len(insts)):
+                inst = insts[index]
                 dy.renew_cg()
                 input = inst.input.word_ids
                 # input = config.insert_singletons(inst.input.word_ids)
