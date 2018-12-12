@@ -30,7 +30,7 @@ def parse_arguments(parser):
         parser.add_argument(arg)
     parser.add_argument('--mode', type=str, default='train')
     parser.add_argument('--gpu', action="store_true", default=False)
-    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--seed', type=int, default=1234)
     parser.add_argument('--digit2zero', action="store_true", default=True)
     parser.add_argument('--train_file', type=str, default="data/conll2003/train.txt")
     parser.add_argument('--dev_file', type=str, default="data/conll2003/dev.txt")
@@ -46,18 +46,18 @@ def parse_arguments(parser):
     parser.add_argument('--num_epochs', type=int, default=30)
 
     ##model hyperparameter
-    parser.add_argument('--hidden_dim', type=int, default=100, help="hidden size of the LSTM")
+    parser.add_argument('--hidden_dim', type=int, default=200, help="hidden size of the LSTM")
     parser.add_argument('--dropout', type=float, default=0.5, help="dropout for embedding")
     # parser.add_argument('--tanh_hidden_dim', type=int, default=100)
-    parser.add_argument('--use_char_rnn', type=bool, default=True, help="use character-level lstm")
+    parser.add_argument('--use_char_rnn', type=int, default=1, choices=[0,1], help="use character-level lstm, 0 or 1")
 
     parser.add_argument('--train_num', type=int, default=-1)
     parser.add_argument('--dev_num', type=int, default=-1)
     parser.add_argument('--test_num', type=int, default=-1)
-    parser.add_argument('--eval_freq', type=int, default=1000,help="evaluate frequency (iteration)")
+    parser.add_argument('--eval_freq', type=int, default=2000,help="evaluate frequency (iteration)")
     parser.add_argument('--eval_epoch',type=int, default=0, help="evaluate the dev set after this number of epoch")
 
-    parser.add_argument("--save_param",type=bool,default=False)
+    parser.add_argument("--save_param",type=int, choices=[0,1] ,default=0)
 
     args = parser.parse_args()
     for k in args.__dict__:
