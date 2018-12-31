@@ -3,11 +3,18 @@
 #
 import dynet as dy
 
+"""Following the equation by Miwa 2016 end-to-end relation extraction.
+    _Paper: https://www.aclweb.org/anthology/P16-1105
+"""
+
 class DepTreeLSTM():
 
     def __init__(self, model, config):
-        wdim = config.embedding_dim
-        hdim = config.tree_hdim
+        # wdim = config.embedding_dim
+        # hdim = config.tree_hdim
+
+        wdim = 10
+        hdim = 20
 
         self.WS = [model.add_parameters((hdim, wdim)) for _ in "ifou"]
         self.BS = [model.add_parameters((wdim)) for _ in "ifou"]
@@ -44,3 +51,9 @@ class DepTreeLSTM():
         h = dy.cmult(o, dy.tanh(c))
         final_h[tree.pos] = h
         return h, c
+
+if __name__ == "__main__":
+
+    model = dy.Model()
+    trnn = DepTreeLSTM()
+    trnn.expr_for_tree()
