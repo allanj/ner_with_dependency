@@ -12,9 +12,9 @@ class TreeLSTMBuilder():
         self.w2i = word_vocab
 
     def expr_for_tree(self, tree, decorate=False, training=True):
-        if tree.isleaf(): raise RuntimeError('Tree structure error: meet with leaves')
+        if tree.is_leaf(): raise RuntimeError('Tree structure error: meet with leaves')
         if len(tree.children) == 1:
-            if not tree.children[0].isleaf(): raise RuntimeError(
+            if not tree.children[0].is_leaf(): raise RuntimeError(
                 'Tree structure error: tree nodes with one child should be a leaf')
             emb = self.E[self.w2i.get(tree.children[0].label, 0)]
             # Wi, Wo, Wu = [dy.parameter(w) for w in self.WS]
