@@ -32,11 +32,11 @@ def parse_arguments(parser):
     parser.add_argument('--gpu', action="store_true", default=False)
     parser.add_argument('--seed', type=int, default=1234)
     parser.add_argument('--digit2zero', action="store_true", default=True)
-    parser.add_argument('--train_file', type=str, default="data/conll2003/train.txt")
-    parser.add_argument('--dev_file', type=str, default="data/conll2003/dev.txt")
-    parser.add_argument('--test_file', type=str, default="data/conll2003/test.txt")
-    parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
-    # parser.add_argument('--embedding_file', type=str, default=None)
+    parser.add_argument('--train_file', type=str, default="data/bn/train.conllx")
+    parser.add_argument('--dev_file', type=str, default="data/bn/dev.conllx")
+    parser.add_argument('--test_file', type=str, default="data/bn/test.conllx")
+    # parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
+    parser.add_argument('--embedding_file', type=str, default=None)
     parser.add_argument('--embedding_dim', type=int, default=100)
     parser.add_argument('--optimizer', type=str, default="adam")
     parser.add_argument('--learning_rate', type=float, default=0.05) ##only for sgd now
@@ -51,9 +51,9 @@ def parse_arguments(parser):
     # parser.add_argument('--tanh_hidden_dim', type=int, default=100)
     parser.add_argument('--use_char_rnn', type=int, default=1, choices=[0,1], help="use character-level lstm, 0 or 1")
 
-    parser.add_argument('--train_num', type=int, default=-1)
-    parser.add_argument('--dev_num', type=int, default=-1)
-    parser.add_argument('--test_num', type=int, default=-1)
+    parser.add_argument('--train_num', type=int, default=10)
+    parser.add_argument('--dev_num', type=int, default=10)
+    parser.add_argument('--test_num', type=int, default=10)
     parser.add_argument('--eval_freq', type=int, default=2000,help="evaluate frequency (iteration)")
     parser.add_argument('--eval_epoch',type=int, default=0, help="evaluate the dev set after this number of epoch")
 
@@ -170,9 +170,9 @@ if __name__ == "__main__":
     reader = Reader(config.digit2zero)
     setSeed(config.seed)
 
-    train_insts = reader.read_from_file(config.train_file, config.train_num, True)
-    dev_insts = reader.read_from_file(config.dev_file, config.dev_num, False)
-    test_insts = reader.read_from_file(config.test_file, config.test_num, False)
+    train_insts = reader.read_conll(config.train_file, config.train_num, True)
+    dev_insts = reader.read_conll(config.dev_file, config.dev_num, False)
+    test_insts = reader.read_conll(config.test_file, config.test_num, False)
 
     config.use_iobes(train_insts)
     config.use_iobes(dev_insts)

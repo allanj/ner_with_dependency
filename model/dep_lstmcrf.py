@@ -1,13 +1,13 @@
 import dynet as dy
-from utils import log_sum_exp
+from config.utils import log_sum_exp
 import numpy as np
-from char_rnn import CharRNN
+from model.char_rnn import CharRNN
 
 START = "<START>"
 STOP = "<STOP>"
 
 
-class BiLSTM_CRF:
+class Dep_BiLSTM_CRF:
 
     def __init__(self, config, model):
         self.num_layers = 1
@@ -32,6 +32,8 @@ class BiLSTM_CRF:
         self.linear_w = self.model.add_parameters((self.num_labels, config.hidden_dim))
         self.linear_bias = self.model.add_parameters((self.num_labels,))
 
+        self.root_head = self.model.add_parameters((config.hidden_dim))
+
         self.transition = self.model.add_lookup_parameters((self.num_labels, self.num_labels))
         vocab_size = len(config.word2idx)
         self.word2idx = config.word2idx
@@ -46,7 +48,7 @@ class BiLSTM_CRF:
         dy.save("basename", [self.char_rnn.char_emb, self.char_rnn.fw_lstm, self.char_rnn.bw_lstm,
                                self.word_embedding, self.bilstm])
 
-    def build_graph_with_char(self, x, all_chars, is_train):
+    def build_graph_with_char(self, x, all_chars, is_train, heads):
 
 
         if is_train:
@@ -65,19 +67,20 @@ class BiLSTM_CRF:
                 concat = dy.concatenate([word_emb, f, b])
                 embeddings.append(concat)
         lstm_out = self.bilstm.transduce(embeddings)
-        # tanh_feats = [dy.tanh(dy.affine_transform([self.tanh_bias, self.tanh_w, rep])) for rep in lstm_out]
-        features = [dy.affine_transform([self.linear_bias, self.linear_w, rep]) for rep in lstm_out]
+        head_states = [lstm_out[head] if head != -1 else self.root_head for head in heads]
+        features = [dy.affine_transform([self.linear_bias, self.linear_w, dy.concatenate(rep, hs)]) for rep,hs in zip(lstm_out, head_states)]
         return features
 
     # computing the negative log-likelihood
-    def build_graph(self, x, is_train):
+    def build_graph(self, x, is_train, heads):
         # dy.renew_cg()
         if is_train:
             embeddings = [dy.dropout(self.word_embedding[w], self.dropout) for w in x]
         else:
             embeddings = [self.word_embedding[w] for w in x]
         lstm_out = self.bilstm.transduce(embeddings)
-        features = [dy.affine_transform([self.linear_bias, self.linear_w, rep]) for rep in lstm_out]
+        head_states = [lstm_out[head] if head != -1 else self.root_head for head in heads]
+        features = [dy.affine_transform([self.linear_bias, self.linear_w, dy.concatenate(rep, hs)]) for rep,hs in zip(lstm_out, head_states)]
         return features
 
     def forward_unlabeled(self, features):

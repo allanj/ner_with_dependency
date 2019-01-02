@@ -51,7 +51,7 @@ if __name__ == "__main__":
     '''###read the tree
     '''
 
-    from reader import Reader
+    from config.reader import Reader
     reader = Reader()
     insts = reader.read_conll("../data/abc/train.conllx", number=1)
 

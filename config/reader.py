@@ -79,6 +79,7 @@ class Reader:
                 else:
                     self.test_vocab[word]=0
                 labels.append(label)
+        print("number of sentences: {}".format(len(insts)))
         return insts
 
 
