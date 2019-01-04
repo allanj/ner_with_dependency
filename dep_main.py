@@ -85,7 +85,7 @@ def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
     # if batch_size != 1:
     #     batch_insts = batching(insts, batch_size)
 
-    model_name= "models/lstm_crf_"+str(config.train_num)+".m"
+    model_name= "models/lstm_crf_{}_{}_head_{}.m".format(config.dataset, config.train_num, config.use_head)
     print("[Info] The model will be saved to: %s, please ensure models folder exist" % (model_name))
     for i in range(epoch):
         epoch_loss = 0
