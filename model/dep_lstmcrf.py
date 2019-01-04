@@ -17,7 +17,15 @@ class Dep_BiLSTM_CRF:
 
         self.char_rnn = CharRNN(config, model) if self.use_char_rnn else None
         input_size = self.input_dim if not self.char_rnn else self.input_dim + config.charlstm_hidden_dim
-        self.bilstm = dy.BiRNNBuilder(1, input_size, config.hidden_dim, self.model,dy.LSTMBuilder)
+
+        self.use_head = config.use_head
+
+        hidden_size = config.hidden_dim
+        if self.use_head:
+            self.root_head = self.model.add_parameters((input_size))
+            input_size *= 2
+            input_size += config.dep_emb_size
+        self.bilstm = dy.BiRNNBuilder(1, input_size, hidden_size, self.model,dy.LSTMBuilder)
         print("Input to word-level BiLSTM size: %d" % (input_size))
         print("BiLSTM hidden size: %d" % (config.hidden_dim))
         # self.bilstm.set_dropout(config.dropout_bilstm)
@@ -26,18 +34,13 @@ class Dep_BiLSTM_CRF:
         self.labels = config.idx2labels
         # print(config.hidden_dim)
 
-        # self.tanh_w = self.model.add_parameters((config.tanh_hidden_dim, config.hidden_dim))
-        # self.tanh_bias = self.model.add_parameters((config.tanh_hidden_dim,))
-        self.use_head = config.use_head
-        hidden_size = 2 * config.hidden_dim if config.use_head else config.hidden_dim
 
         self.linear_w = self.model.add_parameters((self.num_labels, hidden_size))
         self.linear_bias = self.model.add_parameters((self.num_labels,))
 
-        if self.use_head:
-            self.root_head = self.model.add_parameters((config.hidden_dim))
-
+        dep_label_size = len(config.deplabels)
         self.transition = self.model.add_lookup_parameters((self.num_labels, self.num_labels))
+        self.head_label_embeding = self.model.add_lookup_parameters((dep_label_size, config.dep_emb_size))
         vocab_size = len(config.word2idx)
         self.word2idx = config.word2idx
         print("Word Embedding size: %d x %d" % (vocab_size, self.input_dim))
@@ -48,49 +51,27 @@ class Dep_BiLSTM_CRF:
     def save_shared_parameters(self):
         print("Saving the encoder parameter")
         # self.word_embedding.save("models/word_embedding.m")
-        dy.save("basename", [self.char_rnn.char_emb, self.char_rnn.fw_lstm, self.char_rnn.bw_lstm,
-                               self.word_embedding, self.bilstm])
+        dy.save("basename", [self.char_rnn.char_emb, self.char_rnn.fw_lstm, self.char_rnn.bw_lstm, self.word_embedding, self.bilstm])
 
-    def build_graph_with_char(self, x, all_chars, is_train, heads):
-
-
-        if is_train:
-            embeddings = []
-            for w,chars in zip(x, all_chars):
-                word_emb = self.word_embedding[w]
-                f, b = self.char_rnn.forward_char(chars)
-                concat = dy.concatenate([word_emb, f, b])
-                embeddings.append(dy.dropout(concat, self.dropout))
-
-        else:
+    def lstm_scoring(self, x, is_train, all_chars, heads, dep_labels):
+        if self.use_char_rnn:
             embeddings = []
             for w, chars in zip(x, all_chars):
                 word_emb = self.word_embedding[w]
                 f, b = self.char_rnn.forward_char(chars)
                 concat = dy.concatenate([word_emb, f, b])
-                embeddings.append(concat)
-        lstm_out = self.bilstm.transduce(embeddings)
-        if self.use_head:
-            head_states = [lstm_out[head] if head != -1 else self.root_head for head in heads]
-            features = [dy.affine_transform([self.linear_bias, self.linear_w, dy.concatenate([rep, hs])]) for rep,hs in zip(lstm_out, head_states)]
+                embeddings.append(dy.dropout(concat, self.dropout) if is_train else concat)
         else:
-            features = [dy.affine_transform([self.linear_bias, self.linear_w, rep]) for rep in lstm_out]
-        return features
+            embeddings = [dy.dropout(self.word_embedding[w], self.dropout) if is_train else self.word_embedding[w] for w in x ]
 
-    # computing the negative log-likelihood
-    def build_graph(self, x, is_train, heads):
-        # dy.renew_cg()
-        if is_train:
-            embeddings = [dy.dropout(self.word_embedding[w], self.dropout) for w in x]
-        else:
-            embeddings = [self.word_embedding[w] for w in x]
-        lstm_out = self.bilstm.transduce(embeddings)
         if self.use_head:
-            head_states = [lstm_out[head] if head != -1 else self.root_head for head in heads]
-            features = [dy.affine_transform([self.linear_bias, self.linear_w, dy.concatenate([rep, hs])]) for rep, hs in
-                        zip(lstm_out, head_states)]
+            head_emb = [embeddings[head] if head != -1 else self.root_head for head in heads]
+            head_label_emb = [self.head_label_embeding[label]  for label in dep_labels]
+            word_reps =[dy.concatenate([emb, h_emb, hl_emb]) for emb, h_emb, hl_emb in zip(embeddings, head_emb, head_label_emb)]
         else:
-            features = [dy.affine_transform([self.linear_bias, self.linear_w, rep]) for rep in lstm_out]
+            word_reps = embeddings
+        lstm_out = self.bilstm.transduce(word_reps)
+        features = [dy.affine_transform([self.linear_bias, self.linear_w, rep]) for rep in lstm_out]
         return features
 
     def forward_unlabeled(self, features):
@@ -120,8 +101,8 @@ class Dep_BiLSTM_CRF:
 
         return labeled_score
 
-    def negative_log(self, x, y, x_chars=None, heads=None):
-        features = self.build_graph(x, True,heads) if not self.use_char_rnn else self.build_graph_with_char(x,x_chars,True,heads)
+    def negative_log(self, x, y, x_chars=None, heads=None, deplabels = None):
+        features = self.lstm_scoring(x, True, x_chars, heads, deplabels)
         # features = self.build_graph(x, True)
         unlabed_score = self.forward_unlabeled(features)
         labeled_score = self.forward_labeled(features, y)
@@ -161,8 +142,8 @@ class Dep_BiLSTM_CRF:
         # Return best path and best path's score
         return best_path, path_score
 
-    def decode(self, x, x_chars=None, heads=None):
-        features = self.build_graph(x, False, heads) if not self.use_char_rnn else self.build_graph_with_char(x,x_chars,False, heads)
+    def decode(self, x, x_chars=None, heads=None, deplabels=None):
+        features = self.lstm_scoring(x, False, x_chars, heads, deplabels)
         # features = self.build_graph(x, False)
         best_path, path_score = self.viterbi_decoding(features)
         best_path = [self.labels[x] for x in best_path]

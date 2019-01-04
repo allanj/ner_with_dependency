@@ -41,14 +41,15 @@ def parse_arguments(parser):
     parser.add_argument('--momentum', type=float, default=0.0)
     parser.add_argument('--l2', type=float, default=0.0)
     parser.add_argument('--batch_size', type=int, default=1)
-    parser.add_argument('--num_epochs', type=int, default=30)
+    parser.add_argument('--num_epochs', type=int, default=50)
 
     ##model hyperparameter
     parser.add_argument('--hidden_dim', type=int, default=200, help="hidden size of the LSTM")
+    parser.add_argument('--dep_emb_size', type=int, default=50, help="embedding size of dependency")
     parser.add_argument('--dropout', type=float, default=0.5, help="dropout for embedding")
     # parser.add_argument('--tanh_hidden_dim', type=int, default=100)
     parser.add_argument('--use_char_rnn', type=int, default=1, choices=[0, 1], help="use character-level lstm, 0 or 1")
-    parser.add_argument('--use_head', type=int, default=0, choices=[0, 1], help="not use dependency")
+    parser.add_argument('--use_head', type=int, default=1, choices=[0, 1], help="not use dependency")
 
     parser.add_argument('--train_num', type=int, default=-1)
     parser.add_argument('--dev_num', type=int, default=-1)
@@ -95,7 +96,7 @@ def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
             dy.renew_cg()
             input = inst.input.word_ids
             # input = config.insert_singletons(inst.input.word_ids)
-            loss = bicrf.negative_log(input, inst.output, x_chars=inst.input.char_ids, heads=inst.input.heads)
+            loss = bicrf.negative_log(input, inst.output, x_chars=inst.input.char_ids, heads=inst.input.heads, deplabels=inst.input.dep_label_ids)
             loss_value = loss.value()
             loss.backward()
             trainer.update()
@@ -128,14 +129,14 @@ def evaluate(model, dev_insts, test_insts):
     ## evaluation
     for dev_inst in dev_insts:
         dy.renew_cg()
-        dev_inst.prediction = model.decode(dev_inst.input.word_ids, dev_inst.input.char_ids, dev_inst.input.heads)
+        dev_inst.prediction = model.decode(dev_inst.input.word_ids, dev_inst.input.char_ids, dev_inst.input.heads, deplabels=dev_inst.input.dep_label_ids)
     dev_metrics = eval.evaluate(dev_insts)
     # print("precision "+str(metrics[0]) + " recall:" +str(metrics[1])+" f score : " + str(metrics[2]))
     print("[Dev set] Precision: %.2f, Recall: %.2f, F1: %.2f" % (dev_metrics[0], dev_metrics[1], dev_metrics[2]))
     ## evaluation
     for test_inst in test_insts:
         dy.renew_cg()
-        test_inst.prediction = model.decode(test_inst.input.word_ids, test_inst.input.char_ids, test_inst.input.heads)
+        test_inst.prediction = model.decode(test_inst.input.word_ids, test_inst.input.char_ids, test_inst.input.heads, deplabels=test_inst.input.dep_label_ids)
     test_metrics = eval.evaluate(test_insts)
     print("[Test set] Precision: %.2f, Recall: %.2f, F1: %.2f" % (test_metrics[0], test_metrics[1], test_metrics[2]))
     return dev_metrics, test_metrics
@@ -159,6 +160,13 @@ if __name__ == "__main__":
     config.use_iobes(dev_insts)
     config.use_iobes(test_insts)
     config.build_label_idx(train_insts)
+
+    config.build_deplabel_idx(train_insts)
+    config.build_deplabel_idx(dev_insts)
+    config.build_deplabel_idx(test_insts)
+    print("# deplabels: ", config.deplabels)
+    print("dep label 2idx: ", config.deplabel2idx)
+
 
 
     config.build_emb_table(reader.train_vocab, reader.test_vocab)

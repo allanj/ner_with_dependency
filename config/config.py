@@ -69,9 +69,16 @@ class Config:
         self.use_char_rnn = args.use_char_rnn
         self.use_head = args.use_head
 
+        self.dep_emb_size = args.dep_emb_size
+        self.deplabel2idx = {}
+        self.deplabels = []
+
 
         self.save_param = args.save_param
         self.eval_epoch = args.eval_epoch
+
+
+
     # def print(self):
     #     print("")
     #     print("\tuse gpu: " + )
@@ -161,6 +168,13 @@ class Config:
             for word in self.word2idx:
                 self.word_embedding[self.word2idx[word], :] = np.random.uniform(-scale, scale, [1, self.embedding_dim])
 
+    def build_deplabel_idx(self, insts):
+        for inst in insts:
+            for label in inst.input.dep_labels:
+                if label not in self.label2idx:
+                    self.deplabels.append(label)
+                    self.deplabel2idx[label] = len(self.deplabel2idx)
+
 
     def build_label_idx(self, insts):
         for inst in insts:
@@ -201,6 +215,7 @@ class Config:
             words = inst.input.words
             inst.input.word_ids = []
             inst.input.char_ids = []
+            inst.input.dep_label_ids = []
             for word in words:
                 if word in self.word2idx:
                     inst.input.word_ids.append(self.word2idx[word])
@@ -213,6 +228,8 @@ class Config:
                     else:
                         char_id.append(self.char2idx[self.unk])
                 inst.input.char_ids.append(char_id)
+            for label in inst.input.dep_labels:
+                inst.input.dep_label_ids.append(self.deplabel2idx[label])
         #     for label in output:
         #         label_ids.append(self.label2idx[label])
         #     insts_ids.append([word_ids, char_ids, label_ids])
