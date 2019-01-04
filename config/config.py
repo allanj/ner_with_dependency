@@ -29,9 +29,15 @@ class Config:
         self.word_embedding = None
         self.seed = args.seed
         self.digit2zero = args.digit2zero
-        self.train_file = args.train_file
-        self.dev_file = args.dev_file
-        self.test_file = args.test_file
+
+        self.dataset = args.dataset
+
+        self.train_file = "data/"+self.dataset+"/train.conllx"
+        self.dev_file = "data/"+self.dataset+"/dev.conllx"
+        ## following datasets do not have development set
+        if self.dataset in ("abc", "cnn", "mnb", "nbc", "p25", "pri", "voa"):
+            self.dev_file = "data/" + self.dataset + "/test.conllx"
+        self.test_file = "data/"+self.dataset+"/test.conllx"
         self.label2idx = {}
         self.idx2labels = []
         self.char2idx = {}
@@ -61,6 +67,7 @@ class Config:
         self.char_emb_size = 25
         self.charlstm_hidden_dim = 50
         self.use_char_rnn = args.use_char_rnn
+        self.use_head = args.use_head
 
 
         self.save_param = args.save_param
@@ -135,7 +142,7 @@ class Config:
                         self.idx2char.append(c)
         self.num_char = len(self.idx2char)
         # print(self.word2idx)
-        print(self.char2idx)
+        #print(self.char2idx)
 
         if self.embedding is not None:
             print("[Info] Use the pretrained word embedding to initialize: %d x %d" % (len(self.word2idx), self.embedding_dim))

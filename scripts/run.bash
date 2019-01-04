@@ -2,15 +2,25 @@
 
 #autobatch=1
 #--dynet-autobatch
-optimizer=adam
+#optimizer=adam
 #lr=1
-batch=1
-seed=42
+#batch=1
+seed=1234
 #gpu=1
 
-python3 main.py --dynet-seed ${seed} --optimizer ${optimizer} \
-          --batch_size ${batch} --dynet-mem 4096 \
-          --dynet-devices GPU:0 > logs/conll2003_complete.log 2>&1
+datasets=(cnn mnb nbc p25 pri voa bc bn mz nw tc wb)
+heads=(0 1)
+
+
+for (( d=0; d<${#datasets[@]}; d++  )) do
+    dataset=${datasets[$d]}
+    for (( h=0; h<${#heads[@]}; h++  )) do
+        head=${heads[$h]}
+        python3 dep_main.py --dynet-seed ${seed} --use_head ${head} \
+          --dataset ${datasets}  > logs/${dataset}_head_${head}.log 2>&1
+    done
+
+done
 
 
 

@@ -28,11 +28,14 @@ class Dep_BiLSTM_CRF:
 
         # self.tanh_w = self.model.add_parameters((config.tanh_hidden_dim, config.hidden_dim))
         # self.tanh_bias = self.model.add_parameters((config.tanh_hidden_dim,))
+        self.use_head = config.use_head
+        hidden_size = 2 * config.hidden_dim if config.use_head else config.hidden_dim
 
-        self.linear_w = self.model.add_parameters((self.num_labels, config.hidden_dim))
+        self.linear_w = self.model.add_parameters((self.num_labels, hidden_size))
         self.linear_bias = self.model.add_parameters((self.num_labels,))
 
-        self.root_head = self.model.add_parameters((config.hidden_dim))
+        if self.use_head:
+            self.root_head = self.model.add_parameters((config.hidden_dim))
 
         self.transition = self.model.add_lookup_parameters((self.num_labels, self.num_labels))
         vocab_size = len(config.word2idx)
@@ -67,8 +70,11 @@ class Dep_BiLSTM_CRF:
                 concat = dy.concatenate([word_emb, f, b])
                 embeddings.append(concat)
         lstm_out = self.bilstm.transduce(embeddings)
-        head_states = [lstm_out[head] if head != -1 else self.root_head for head in heads]
-        features = [dy.affine_transform([self.linear_bias, self.linear_w, dy.concatenate(rep, hs)]) for rep,hs in zip(lstm_out, head_states)]
+        if self.use_head:
+            head_states = [lstm_out[head] if head != -1 else self.root_head for head in heads]
+            features = [dy.affine_transform([self.linear_bias, self.linear_w, dy.concatenate([rep, hs])]) for rep,hs in zip(lstm_out, head_states)]
+        else:
+            features = [dy.affine_transform([self.linear_bias, self.linear_w, rep]) for rep in lstm_out]
         return features
 
     # computing the negative log-likelihood
@@ -79,8 +85,12 @@ class Dep_BiLSTM_CRF:
         else:
             embeddings = [self.word_embedding[w] for w in x]
         lstm_out = self.bilstm.transduce(embeddings)
-        head_states = [lstm_out[head] if head != -1 else self.root_head for head in heads]
-        features = [dy.affine_transform([self.linear_bias, self.linear_w, dy.concatenate(rep, hs)]) for rep,hs in zip(lstm_out, head_states)]
+        if self.use_head:
+            head_states = [lstm_out[head] if head != -1 else self.root_head for head in heads]
+            features = [dy.affine_transform([self.linear_bias, self.linear_w, dy.concatenate([rep, hs])]) for rep, hs in
+                        zip(lstm_out, head_states)]
+        else:
+            features = [dy.affine_transform([self.linear_bias, self.linear_w, rep]) for rep in lstm_out]
         return features
 
     def forward_unlabeled(self, features):
@@ -110,8 +120,8 @@ class Dep_BiLSTM_CRF:
 
         return labeled_score
 
-    def negative_log(self, x, y, x_chars=None):
-        features = self.build_graph(x, True) if not self.use_char_rnn else self.build_graph_with_char(x,x_chars,True)
+    def negative_log(self, x, y, x_chars=None, heads=None):
+        features = self.build_graph(x, True,heads) if not self.use_char_rnn else self.build_graph_with_char(x,x_chars,True,heads)
         # features = self.build_graph(x, True)
         unlabed_score = self.forward_unlabeled(features)
         labeled_score = self.forward_labeled(features, y)
@@ -151,8 +161,8 @@ class Dep_BiLSTM_CRF:
         # Return best path and best path's score
         return best_path, path_score
 
-    def decode(self, x, x_chars=None):
-        features = self.build_graph(x, False) if not self.use_char_rnn else self.build_graph_with_char(x,x_chars,False)
+    def decode(self, x, x_chars=None, heads=None):
+        features = self.build_graph(x, False, heads) if not self.use_char_rnn else self.build_graph_with_char(x,x_chars,False, heads)
         # features = self.build_graph(x, False)
         best_path, path_score = self.viterbi_decoding(features)
         best_path = [self.labels[x] for x in best_path]
