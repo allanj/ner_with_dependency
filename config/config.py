@@ -171,7 +171,7 @@ class Config:
     def build_deplabel_idx(self, insts):
         for inst in insts:
             for label in inst.input.dep_labels:
-                if label not in self.label2idx:
+                if label not in self.deplabels:
                     self.deplabels.append(label)
                     self.deplabel2idx[label] = len(self.deplabel2idx)
 
