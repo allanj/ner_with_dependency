@@ -5,7 +5,7 @@
 import spacy
 from spacy.pipeline import DependencyParser
 from spacy.tokens import Doc
-nlp = spacy.load('en_core_web_lg', disable=['tagger', 'ner'])
+nlp = spacy.load('en_core_web_sm', disable=['tagger', 'ner'])
 # nlp = spacy.load('en_core_web_sm', disable=['tagger', 'ner'])
 # print(type(nlp.vocab))
 #
@@ -33,7 +33,7 @@ for name, proc in nlp.pipeline:
 # processed = nlp(doc)
 print("length of the sentence:", len(doc))
 for tok in doc:
-    print(tok, tok.tag_, tok.head , tok.head.i)
+    print(tok.i, tok, tok.tag_, tok.head , tok.head.i, tok.dep_)
 # for chunk in doc.noun_chunks:
 #     print(chunk.text, chunk.root.text, chunk.root.dep_,
 #           chunk.root.head.text)

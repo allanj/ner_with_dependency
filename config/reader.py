@@ -16,37 +16,6 @@ class Reader:
         self.train_vocab = {}
         self.test_vocab = {}
 
-
-    def read_from_file(self, file, number=-1, is_train=True):
-        print("Reading file: " + file)
-        insts = []
-        # vocab = set() ## build the vocabulary
-        with open(file, 'r', encoding='utf-8') as f:
-            words = []
-            pos_tags = []
-            labels = []
-            for line in tqdm(f.readlines()):
-                line = line.rstrip()
-                if line == "":
-                    insts.append(Instance(Sentence(words, pos_tags=pos_tags), labels))
-                    words = []
-                    pos_tags = []
-                    labels = []
-                    if len(insts) == number:
-                        break
-                    continue
-                word, pos, label = line.split()
-                if self.digit2zero:
-                    word = re.sub('\d', '0', word)
-                words.append(word)
-                pos_tags.append(pos)
-                if is_train:
-                    self.train_vocab[word]=0
-                else:
-                    self.test_vocab[word]=0
-                labels.append(label)
-        return insts
-
     def read_conll(self, file: str, number: int = -1, is_train: bool = True) -> List[Instance]:
         print("Reading file: " + file)
         insts = []
@@ -69,12 +38,15 @@ class Reader:
                     if len(insts) == number:
                         break
                     continue
-                vals = line.split()
-                word = vals[1]
-                head = int(vals[6])
-                dep_label = vals[7]
-                pos = vals[3]
-                label = vals[10]
+                if "conll2003" in file:
+                    word, pos, label, head, dep_label = line.split()
+                else:
+                    vals = line.split()
+                    word = vals[1]
+                    head = int(vals[6])
+                    dep_label = vals[7]
+                    pos = vals[3]
+                    label = vals[10]
                 if self.digit2zero:
                     word = re.sub('\d', '0', word) # replace digit with 0.
                 words.append(word)
