@@ -32,7 +32,7 @@ def parse_arguments(parser):
     parser.add_argument('--gpu', action="store_true", default=False)
     parser.add_argument('--seed', type=int, default=1234)
     parser.add_argument('--digit2zero', action="store_true", default=True)
-    parser.add_argument('--dataset', type=str, default="all")
+    parser.add_argument('--dataset', type=str, default="abc")
     parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
     # parser.add_argument('--embedding_file', type=str, default=None)
     parser.add_argument('--embedding_dim', type=int, default=100)
@@ -49,7 +49,7 @@ def parse_arguments(parser):
     parser.add_argument('--dropout', type=float, default=0.5, help="dropout for embedding")
     # parser.add_argument('--tanh_hidden_dim', type=int, default=100)
     parser.add_argument('--use_char_rnn', type=int, default=1, choices=[0, 1], help="use character-level lstm, 0 or 1")
-    parser.add_argument('--use_head', type=int, default=1, choices=[0, 1], help="not use dependency")
+    parser.add_argument('--use_head', type=int, default=0, choices=[0, 1], help="not use dependency")
 
     parser.add_argument('--train_num', type=int, default=-1)
     parser.add_argument('--dev_num', type=int, default=-1)
@@ -85,7 +85,8 @@ def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
     # if batch_size != 1:
     #     batch_insts = batching(insts, batch_size)
 
-    model_name= "models/lstm_crf_{}_{}_head_{}.m".format(config.dataset, config.train_num, config.use_head)
+    model_name = "models/lstm_crf_{}_{}_head_{}.m".format(config.dataset, config.train_num, config.use_head)
+    res_name = "results/lstm_crf_{}_{}_head_{}.results".format(config.dataset, config.train_num, config.use_head)
     print("[Info] The model will be saved to: %s, please ensure models folder exist" % (model_name))
     for i in range(epoch):
         epoch_loss = 0
@@ -104,42 +105,61 @@ def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
             k = k + 1
 
             if i + 1 >= config.eval_epoch and (k % config.eval_freq == 0 or k == len(insts)):
-                dev_metrics, test_metrics = evaluate(bicrf, dev_insts, test_insts)
+                dev_metrics = evaluate(bicrf, dev_insts, "dev")
+                test_metrics = evaluate(bicrf, test_insts, "test")
                 if dev_metrics[2] > best_dev[0]:
                     best_dev[0] = dev_metrics[2]
                     best_dev[1] = i
+                    best_test[0] = test_metrics[2]
+                    best_test[1] = i
                     model.save(model_name)
                     if config.save_param:
                         bicrf.save_shared_parameters()  ##Optional step
-                if test_metrics[2] > best_test[0]:
-                    best_test[0] = test_metrics[2]
-                    best_test[1] = i
                 k = 0
         end_time = time.time()
 
         print("Epoch %d: %.5f, Time is %.2fs" % (i + 1, epoch_loss, end_time-start_time), flush=True)
     print("The best dev: %.2f" % (best_dev[0]))
-    print("The best test: %.2f" % (best_test[0]))
-    # model.populate(model_name)
-    # evaluate(bicrf, dev_insts, test_insts)
+    print("The corresponding test: %.2f" % (best_test[0]))
+    model.populate(model_name)
+    evaluate(bicrf, test_insts, "test")
+    write_results(res_name,test_insts)
     # if config.save_param:
     #     bicrf.save_shared_parameters()
 
-def evaluate(model, dev_insts, test_insts):
+
+def test():
+    model_name = "models/lstm_crf_{}_{}_head_{}.m".format(config.dataset, config.train_num, config.use_head)
+    res_name = "results/lstm_crf_{}_{}_head_{}.results".format(config.dataset, config.train_num, config.use_head)
+    model = dy.ParameterCollection()
+    bicrf = Dep_BiLSTM_CRF(config, model)
+    model.populate(model_name)
+    evaluate(bicrf, test_insts, "test")
+    write_results(res_name, test_insts)
+
+def write_results(filename:str, insts):
+    f = open(filename, 'w', encoding='utf-8')
+    for inst in insts:
+        for i in range(len(inst.input)):
+            words = inst.input.words
+            tags = inst.input.pos_tags
+            heads = inst.input.heads
+            dep_labels = inst.input.dep_labels
+            output = inst.output
+            prediction = inst.prediction
+            f.write("{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(i, words[i], tags[i], heads[i], dep_labels[i], output[i], prediction[i]))
+        f.write("\n")
+    f.close()
+
+def evaluate(model, insts, name:str):
     ## evaluation
-    for dev_inst in dev_insts:
+    for inst in insts:
         dy.renew_cg()
-        dev_inst.prediction = model.decode(dev_inst.input.word_ids, dev_inst.input.char_ids, dev_inst.input.heads, deplabels=dev_inst.input.dep_label_ids)
-    dev_metrics = eval.evaluate(dev_insts)
+        inst.prediction = model.decode(inst.input.word_ids, inst.input.char_ids, inst.input.heads, deplabels=inst.input.dep_label_ids)
+    metrics = eval.evaluate(insts)
     # print("precision "+str(metrics[0]) + " recall:" +str(metrics[1])+" f score : " + str(metrics[2]))
-    print("[Dev set] Precision: %.2f, Recall: %.2f, F1: %.2f" % (dev_metrics[0], dev_metrics[1], dev_metrics[2]))
-    ## evaluation
-    for test_inst in test_insts:
-        dy.renew_cg()
-        test_inst.prediction = model.decode(test_inst.input.word_ids, test_inst.input.char_ids, test_inst.input.heads, deplabels=test_inst.input.dep_label_ids)
-    test_metrics = eval.evaluate(test_insts)
-    print("[Test set] Precision: %.2f, Recall: %.2f, F1: %.2f" % (test_metrics[0], test_metrics[1], test_metrics[2]))
-    return dev_metrics, test_metrics
+    print("[%s set] Precision: %.2f, Recall: %.2f, F1: %.2f" % (name, metrics[0], metrics[1], metrics[2]))
+    return metrics
 
 if __name__ == "__main__":
 
@@ -183,7 +203,10 @@ if __name__ == "__main__":
 
     print("num words: " + str(len(config.word2idx)))
     # print(config.word2idx)
-
-    train(config.num_epochs, train_insts, dev_insts, test_insts, config.batch_size)
+    if opt.mode == "train":
+        train(config.num_epochs, train_insts, dev_insts, test_insts, config.batch_size)
+    else:
+        ## Load the trained model.
+        test()
 
     print(opt.mode)

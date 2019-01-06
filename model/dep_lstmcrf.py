@@ -40,8 +40,8 @@ class Dep_BiLSTM_CRF:
 
         dep_label_size = len(config.deplabels)
         self.transition = self.model.add_lookup_parameters((self.num_labels, self.num_labels))
-        if self.use_head:
-            self.head_label_embeding = self.model.add_lookup_parameters((dep_label_size, config.dep_emb_size))
+        # if self.use_head:
+        self.head_label_embeding = self.model.add_lookup_parameters((dep_label_size, config.dep_emb_size))
         vocab_size = len(config.word2idx)
         self.word2idx = config.word2idx
         print("Word Embedding size: %d x %d" % (vocab_size, self.input_dim))
