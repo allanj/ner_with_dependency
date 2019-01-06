@@ -39,7 +39,7 @@ class Reader:
                         break
                     continue
                 if "conll2003" in file:
-                    word, pos, label, head, dep_label = line.split()
+                    word, pos, head, dep_label, label = line.split()
                 else:
                     vals = line.split()
                     word = vals[1]
@@ -50,7 +50,7 @@ class Reader:
                 if self.digit2zero:
                     word = re.sub('\d', '0', word) # replace digit with 0.
                 words.append(word)
-                heads.append(head - 1) ## because of 0-indexed.
+                heads.append(int(head) if "conll2003" in file else head - 1) ## because of 0-indexed.
                 deps.append(dep_label)
                 tags.append(pos)
                 if is_train:

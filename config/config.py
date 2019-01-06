@@ -2,10 +2,8 @@
 # @author: Allan
 #
 
-import torch
 import numpy as np
 from tqdm import tqdm
-import torch.optim as optim
 
 
 class Config:
