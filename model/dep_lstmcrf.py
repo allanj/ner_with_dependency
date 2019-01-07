@@ -14,12 +14,15 @@ class Dep_BiLSTM_CRF:
         self.input_dim = config.embedding_dim
         self.model = model
         self.use_char_rnn = config.use_char_rnn
+        self.use_head = config.use_head
+        self.use_elmo = config.use_elmo
+
 
         self.char_rnn = CharRNN(config, model) if self.use_char_rnn else None
         input_size = self.input_dim if not self.char_rnn else self.input_dim + config.charlstm_hidden_dim
+        input_size = input_size + 1024 if self.use_elmo else input_size
 
-        self.use_head = config.use_head
-        self.use_elmo = config.use_elmo
+
         hidden_size = config.hidden_dim
         if self.use_head:
             self.root_head = self.model.add_parameters((input_size))
@@ -66,7 +69,7 @@ class Dep_BiLSTM_CRF:
             embeddings = [dy.dropout(self.word_embedding[w], self.dropout) if is_train else self.word_embedding[w] for w in x ]
 
         if self.use_elmo:
-            embeddings = [dy.concatenate(emb, dy.inputVector(vec)) for emb, vec in zip(embeddings, elmo_vec)]
+            embeddings = [dy.concatenate([emb, dy.inputVector(vec)]) for emb, vec in zip(embeddings, elmo_vec)]
 
         if self.use_head:
             head_emb = [embeddings[head] if head != -1 else self.root_head for head in heads]
@@ -146,8 +149,8 @@ class Dep_BiLSTM_CRF:
         # Return best path and best path's score
         return best_path, path_score
 
-    def decode(self, x, x_chars=None, heads=None, deplabels=None):
-        features = self.lstm_scoring(x, False, x_chars, heads, deplabels)
+    def decode(self, x, x_chars=None, heads=None, deplabels=None, elmo_vec=None):
+        features = self.lstm_scoring(x, False, x_chars, heads, deplabels,elmo_vec=elmo_vec)
         # features = self.build_graph(x, False)
         best_path, path_score = self.viterbi_decoding(features)
         best_path = [self.labels[x] for x in best_path]

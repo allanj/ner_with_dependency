@@ -32,7 +32,7 @@ def parse_arguments(parser):
     parser.add_argument('--gpu', action="store_true", default=False)
     parser.add_argument('--seed', type=int, default=1234)
     parser.add_argument('--digit2zero', action="store_true", default=True)
-    parser.add_argument('--dataset', type=str, default="abc")
+    parser.add_argument('--dataset', type=str, default="conll2003")
     parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
     # parser.add_argument('--embedding_file', type=str, default=None)
     parser.add_argument('--embedding_dim', type=int, default=100)
@@ -87,8 +87,8 @@ def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
     # if batch_size != 1:
     #     batch_insts = batching(insts, batch_size)
 
-    model_name = "models/lstm_crf_{}_{}_head_{}.m".format(config.dataset, config.train_num, config.use_head)
-    res_name = "results/lstm_crf_{}_{}_head_{}.results".format(config.dataset, config.train_num, config.use_head)
+    model_name = "models/lstm_crf_{}_{}_head_{}_elmo_{}.m".format(config.dataset, config.train_num, config.use_head, config.use_elmo)
+    res_name = "results/lstm_crf_{}_{}_head_{}_elmo_{}.results".format(config.dataset, config.train_num, config.use_head, config.use_elmo)
     print("[Info] The model will be saved to: %s, please ensure models folder exist" % (model_name))
     for i in range(epoch):
         epoch_loss = 0
@@ -183,6 +183,7 @@ if __name__ == "__main__":
 
 
     if config.use_elmo:
+        print('Loading the elmo vectors for all datasets.')
         reader.load_elmo_vec(config.train_file + ".elmo.vec", train_insts)
         reader.load_elmo_vec(config.dev_file + ".elmo.vec", dev_insts)
         reader.load_elmo_vec(config.test_file + ".elmo.vec", test_insts)

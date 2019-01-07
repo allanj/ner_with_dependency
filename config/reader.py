@@ -63,7 +63,7 @@ class Reader:
         return insts
 
     def load_elmo_vec(self, file, insts):
-        f = open(file, 'rb', encoding='utf-8')
+        f = open(file, 'rb')
         all_vecs = pickle.load(f)  # variables come out in the order you put them in
         f.close()
         for vec, inst in zip(all_vecs, insts):
