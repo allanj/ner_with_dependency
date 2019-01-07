@@ -32,6 +32,7 @@ class Dep_BiLSTM_CRF:
 
         self.use2layerLSTM = config.second_hidden_size > 0
         if self.use2layerLSTM:
+            print("Second BiLSTM: {} x {}".format(hidden_size, config.second_hidden_size))
             self.second_bilstm = dy.BiRNNBuilder(1, hidden_size, config.second_hidden_size, self.model,dy.LSTMBuilder)
             hidden_size = config.second_hidden_size
 
