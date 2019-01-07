@@ -7,6 +7,7 @@ from common.sentence import Sentence
 from common.instance import Instance
 from typing import List
 import re
+import pickle
 
 class Reader:
 
@@ -60,5 +61,12 @@ class Reader:
                 labels.append(label)
         print("number of sentences: {}".format(len(insts)))
         return insts
+
+    def load_elmo_vec(self, file, insts):
+        f = open(file, 'rb', encoding='utf-8')
+        all_vecs = pickle.load(f)  # variables come out in the order you put them in
+        f.close()
+        for vec, inst in zip(all_vecs, insts):
+            inst.elmo_vec = vec
 
 

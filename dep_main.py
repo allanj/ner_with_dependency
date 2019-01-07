@@ -51,6 +51,8 @@ def parse_arguments(parser):
     parser.add_argument('--use_char_rnn', type=int, default=1, choices=[0, 1], help="use character-level lstm, 0 or 1")
     parser.add_argument('--use_head', type=int, default=0, choices=[0, 1], help="not use dependency")
 
+    parser.add_argument('--use_elmo', type=int, default=0, choices=[0, 1], help="use Elmo embedding or not")
+
     parser.add_argument('--train_num', type=int, default=-1)
     parser.add_argument('--dev_num', type=int, default=-1)
     parser.add_argument('--test_num', type=int, default=-1)
@@ -97,7 +99,7 @@ def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
             dy.renew_cg()
             input = inst.input.word_ids
             # input = config.insert_singletons(inst.input.word_ids)
-            loss = bicrf.negative_log(input, inst.output, x_chars=inst.input.char_ids, heads=inst.input.heads, deplabels=inst.input.dep_label_ids)
+            loss = bicrf.negative_log(input, inst.output, x_chars=inst.input.char_ids, heads=inst.input.heads, deplabels=inst.input.dep_label_ids, elmo_vec=inst.elmo_vec)
             loss_value = loss.value()
             loss.backward()
             trainer.update()
@@ -128,6 +130,17 @@ def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
     #     bicrf.save_shared_parameters()
 
 
+def evaluate(model, insts, name:str):
+    ## evaluation
+    for inst in insts:
+        dy.renew_cg()
+        inst.prediction = model.decode(inst.input.word_ids, inst.input.char_ids, inst.input.heads, deplabels=inst.input.dep_label_ids, elmo_vec=inst.elmo_vec)
+    metrics = eval.evaluate(insts)
+    # print("precision "+str(metrics[0]) + " recall:" +str(metrics[1])+" f score : " + str(metrics[2]))
+    print("[%s set] Precision: %.2f, Recall: %.2f, F1: %.2f" % (name, metrics[0], metrics[1], metrics[2]))
+    return metrics
+
+
 def test():
     model_name = "models/lstm_crf_{}_{}_head_{}.m".format(config.dataset, config.train_num, config.use_head)
     res_name = "results/lstm_crf_{}_{}_head_{}.results".format(config.dataset, config.train_num, config.use_head)
@@ -151,15 +164,7 @@ def write_results(filename:str, insts):
         f.write("\n")
     f.close()
 
-def evaluate(model, insts, name:str):
-    ## evaluation
-    for inst in insts:
-        dy.renew_cg()
-        inst.prediction = model.decode(inst.input.word_ids, inst.input.char_ids, inst.input.heads, deplabels=inst.input.dep_label_ids)
-    metrics = eval.evaluate(insts)
-    # print("precision "+str(metrics[0]) + " recall:" +str(metrics[1])+" f score : " + str(metrics[2]))
-    print("[%s set] Precision: %.2f, Recall: %.2f, F1: %.2f" % (name, metrics[0], metrics[1], metrics[2]))
-    return metrics
+
 
 if __name__ == "__main__":
 
@@ -175,6 +180,12 @@ if __name__ == "__main__":
     train_insts = reader.read_conll(config.train_file, config.train_num, True)
     dev_insts = reader.read_conll(config.dev_file, config.dev_num, False)
     test_insts = reader.read_conll(config.test_file, config.test_num, False)
+
+
+    if config.use_elmo:
+        reader.load_elmo_vec(config.train_file + ".elmo.vec", train_insts)
+        reader.load_elmo_vec(config.dev_file + ".elmo.vec", dev_insts)
+        reader.load_elmo_vec(config.test_file + ".elmo.vec", test_insts)
 
     config.use_iobes(train_insts)
     config.use_iobes(dev_insts)

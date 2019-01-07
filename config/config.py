@@ -75,6 +75,8 @@ class Config:
         self.save_param = args.save_param
         self.eval_epoch = args.eval_epoch
 
+        self.use_elmo = args.use_elmo
+
 
 
     # def print(self):

@@ -19,7 +19,7 @@ class Dep_BiLSTM_CRF:
         input_size = self.input_dim if not self.char_rnn else self.input_dim + config.charlstm_hidden_dim
 
         self.use_head = config.use_head
-
+        self.use_elmo = config.use_elmo
         hidden_size = config.hidden_dim
         if self.use_head:
             self.root_head = self.model.add_parameters((input_size))
@@ -54,7 +54,7 @@ class Dep_BiLSTM_CRF:
         # self.word_embedding.save("models/word_embedding.m")
         dy.save("basename", [self.char_rnn.char_emb, self.char_rnn.fw_lstm, self.char_rnn.bw_lstm, self.word_embedding, self.bilstm])
 
-    def lstm_scoring(self, x, is_train, all_chars, heads, dep_labels):
+    def lstm_scoring(self, x, is_train, all_chars, heads, dep_labels, elmo_vec):
         if self.use_char_rnn:
             embeddings = []
             for w, chars in zip(x, all_chars):
@@ -64,6 +64,9 @@ class Dep_BiLSTM_CRF:
                 embeddings.append(dy.dropout(concat, self.dropout) if is_train else concat)
         else:
             embeddings = [dy.dropout(self.word_embedding[w], self.dropout) if is_train else self.word_embedding[w] for w in x ]
+
+        if self.use_elmo:
+            embeddings = [dy.concatenate(emb, dy.inputVector(vec)) for emb, vec in zip(embeddings, elmo_vec)]
 
         if self.use_head:
             head_emb = [embeddings[head] if head != -1 else self.root_head for head in heads]
@@ -102,8 +105,8 @@ class Dep_BiLSTM_CRF:
 
         return labeled_score
 
-    def negative_log(self, x, y, x_chars=None, heads=None, deplabels = None):
-        features = self.lstm_scoring(x, True, x_chars, heads, deplabels)
+    def negative_log(self, x, y, x_chars=None, heads=None, deplabels = None, elmo_vec=None):
+        features = self.lstm_scoring(x, True, x_chars, heads, deplabels, elmo_vec)
         # features = self.build_graph(x, True)
         unlabed_score = self.forward_unlabeled(features)
         labeled_score = self.forward_labeled(features, y)
