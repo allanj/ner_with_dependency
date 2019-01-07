@@ -76,6 +76,8 @@ class Config:
         self.eval_epoch = args.eval_epoch
 
         self.use_elmo = args.use_elmo
+        # self.use2layerLSTM = args.use2layerLSTM
+        self.second_hidden_size = args.second_hidden_size
 
 
 

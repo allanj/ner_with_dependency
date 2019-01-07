@@ -29,6 +29,12 @@ class Dep_BiLSTM_CRF:
             input_size *= 2
             input_size += config.dep_emb_size
         self.bilstm = dy.BiRNNBuilder(1, input_size, hidden_size, self.model,dy.LSTMBuilder)
+
+        self.use2layerLSTM = config.second_hidden_size > 0
+        if self.use2layerLSTM:
+            self.second_bilstm = dy.BiRNNBuilder(1, hidden_size, config.second_hidden_size, self.model,dy.LSTMBuilder)
+            hidden_size = config.second_hidden_size
+
         print("Input to word-level BiLSTM size: %d" % (input_size))
         print("BiLSTM hidden size: %d" % (config.hidden_dim))
         # self.bilstm.set_dropout(config.dropout_bilstm)
@@ -78,6 +84,9 @@ class Dep_BiLSTM_CRF:
         else:
             word_reps = embeddings
         lstm_out = self.bilstm.transduce(word_reps)
+        if self.use2layerLSTM:
+            lstm_out = self.second_bilstm.transduce(lstm_out)
+
         features = [dy.affine_transform([self.linear_bias, self.linear_w, rep]) for rep in lstm_out]
         return features
 

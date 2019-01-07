@@ -53,6 +53,9 @@ def parse_arguments(parser):
 
     parser.add_argument('--use_elmo', type=int, default=0, choices=[0, 1], help="use Elmo embedding or not")
 
+    # parser.add_argument('--use2layerLSTM', type=int, default=0, choices=[0, 1], help="use 2 layer bilstm")
+    parser.add_argument('--second_hidden_size', type=int, default=0, help="hidden size for 2nd bilstm layer")
+
     parser.add_argument('--train_num', type=int, default=-1)
     parser.add_argument('--dev_num', type=int, default=-1)
     parser.add_argument('--test_num', type=int, default=-1)
@@ -87,8 +90,8 @@ def train(epoch, insts, dev_insts, test_insts, batch_size = 1):
     # if batch_size != 1:
     #     batch_insts = batching(insts, batch_size)
 
-    model_name = "models/lstm_crf_{}_{}_head_{}_elmo_{}.m".format(config.dataset, config.train_num, config.use_head, config.use_elmo)
-    res_name = "results/lstm_crf_{}_{}_head_{}_elmo_{}.results".format(config.dataset, config.train_num, config.use_head, config.use_elmo)
+    model_name = "models/lstm_{}_{}_crf_{}_{}_head_{}_elmo_{}.m".format(config.hidden_dim, config.second_hidden_size, config.dataset, config.train_num, config.use_head, config.use_elmo)
+    res_name = "results/lstm_{}_{}_crf_{}_{}_head_{}_elmo_{}.results".format(config.hidden_dim, config.second_hidden_size, config.dataset, config.train_num, config.use_head, config.use_elmo)
     print("[Info] The model will be saved to: %s, please ensure models folder exist" % (model_name))
     for i in range(epoch):
         epoch_loss = 0
