@@ -70,10 +70,38 @@
 # print(x.dim()[0])
 
 
-a = {}
-a["b"]=0
-a["sdgf"]=0
-a["BB"]=0
-a["a"]=0
-for x in a:
-    print(x)
+import torch
+import torch.nn as nn
+import numpy as np
+device = torch.device('cuda:0')
+# word_embedding = nn.Embedding(10, 25).to(device)
+
+
+num_indexs = 100
+x= torch.randn(num_indexs)
+print(x.size())
+num_row = 15
+num_edges = 6
+
+
+iter = 1000000
+import time
+start = time.time()
+for i in range(iter):
+    index = torch.randint(0, 100, (num_row, num_edges), dtype=torch.long)
+    x_view = x.view(1, -1).expand(num_row, -1)
+    x_expr = torch.gather(x_view, 1, index)
+
+end = time.time()
+print("time is {:.5f}s".format(end-start))
+
+start = time.time()
+for i in range(iter):
+    index = torch.randint(0, 100, (num_row, num_edges), dtype=torch.long)
+    # x_view = x.view(1, -1).expand(num_row, -1)
+    # x_expr = torch.gather(x_view, 1, index)
+    x_expr = torch.take(x, index)
+end = time.time()
+
+print("time is {:.5f}s".format(end-start))
+
