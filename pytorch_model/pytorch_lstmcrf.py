@@ -81,7 +81,7 @@ class NNCRF(nn.Module):
     def forward_unlabeled(self, all_scores, word_seq_lens, masks):
         batch_size = all_scores.size(0)
         seq_len = all_scores.size(1)
-        alpha = torch.zeros(batch_size, seq_len, self.tagSize).to(self.device)
+        alpha = torch.zeros(batch_size, seq_len, self.label_size).to(self.device)
 
         alpha[:, 0, :] = all_scores[:, 0,  self.start_idx, :] ## the first position of all labels = (the transition from start - > all labels) + current emission.
 
@@ -109,11 +109,11 @@ class NNCRF(nn.Module):
         sentLength = all_scores.shape[1]
 
         ## all the scores to current labels: batch, seq_len, label_size
-        currentTagScores = torch.gather(all_scores, 3, tags.view(batchSize, sentLength, 1, 1).expand(batchSize, sentLength, self.tagSize, 1)).view(batchSize, -1, self.tagSize)
+        currentTagScores = torch.gather(all_scores, 3, tags.view(batchSize, sentLength, 1, 1).expand(batchSize, sentLength, self.label_size, 1)).view(batchSize, -1, self.label_size)
         tagTransScoresMiddle = torch.gather(currentTagScores[:, 1:, :], 2, tags[:, : sentLength - 1].view(batchSize, sentLength - 1, 1)).view(batchSize, -1)
         tagTransScoresBegin = currentTagScores[:, 0, self.start_idx]
         endTagIds = torch.gather(tags, 1, word_seq_lens.view(batchSize, 1) - 1)
-        tagTransScoresEnd = torch.gather(self.transitions[:, self.end_idx].view(1, self.tagSize).expand(batchSize, self.tagSize), 1,  endTagIds).view(batchSize)
+        tagTransScoresEnd = torch.gather(self.transitions[:, self.end_idx].view(1, self.label_size).expand(batchSize, self.label_size), 1,  endTagIds).view(batchSize)
 
         return torch.sum(tagTransScoresBegin) + torch.sum(tagTransScoresMiddle.masked_select(masks[:, 1:])) + torch.sum(
             tagTransScoresEnd)
@@ -127,33 +127,33 @@ class NNCRF(nn.Module):
 
     def viterbiDecode(self, features, seqLens):
         batchSize = len(features)
-        scoresRecord = torch.zeros([batchSize, features.shape[1], self.tagSize]).to(self.device)
-        idxRecord = torch.zeros([batchSize, features.shape[1], self.tagSize], dtype=torch.int64).to(self.device)
+        scoresRecord = torch.zeros([batchSize, features.shape[1], self.label_size]).to(self.device)
+        idxRecord = torch.zeros([batchSize, features.shape[1], self.label_size], dtype=torch.int64).to(self.device)
         mask = torch.ones_like(seqLens, dtype=torch.int64).to(self.device)
-        startIds = torch.full((batchSize, self.tagSize), self.start_idx, dtype=torch.int64).to(self.device)
+        startIds = torch.full((batchSize, self.label_size), self.start_idx, dtype=torch.int64).to(self.device)
         decodeIdx = torch.LongTensor(batchSize, features.shape[1]).to(self.device)
 
         scores = self.transitions.view(1, 1, self.label_size, self.label_size).expand(
             batchSize, features.shape[1], self.label_size, self.label_size) + \
                  features.view(batchSize, features.shape[1], 1, self.label_size).expand(batchSize, features.shape[1],
                                                                                      self.label_size, self.label_size)
-        # scoresRecord[:, 0, :] = self.getInitAlphaWithBatchSize(batchSize).view(batchSize, self.tagSize)
+        # scoresRecord[:, 0, :] = self.getInitAlphaWithBatchSize(batchSize).view(batchSize, self.label_size)
         scoresRecord[:, 0, :] = scores[:, 0, self.start_idx, :]  ## represent the best current score from the start, is the best
         idxRecord[:,  0, :] = startIds
         for wordIdx in range(1, features.shape[1]):
             ### scoresIdx: batch x from_label x to_label at current index.
-            scoresIdx = scoresRecord[:, wordIdx - 1, :].view(batchSize, self.tagSize, 1).expand(batchSize, self.tagSize,
-                                                                                  self.tagSize) + scores[:, wordIdx, :, :]
+            scoresIdx = scoresRecord[:, wordIdx - 1, :].view(batchSize, self.label_size, 1).expand(batchSize, self.label_size,
+                                                                                  self.label_size) + scores[:, wordIdx, :, :]
             idxRecord[:, wordIdx, :] = torch.argmax(scoresIdx, 1)  ## the best previous label idx to crrent labels
-            scoresRecord[:, wordIdx, :] = torch.gather(scoresIdx, 1, idxRecord[:, wordIdx, :].view(batchSize, 1, self.tagSize)).view(batchSize, self.tagSize)
+            scoresRecord[:, wordIdx, :] = torch.gather(scoresIdx, 1, idxRecord[:, wordIdx, :].view(batchSize, 1, self.label_size)).view(batchSize, self.label_size)
 
-        lastScores = torch.gather(scoresRecord, 1, seqLens.view(batchSize, 1, 1).expand(batchSize, 1, self.tagSize) - 1).view(batchSize, self.tagSize)  ##select position
-        lastScores += self.transitions[:, self.end_idx].view(1, self.tagSize).expand(batchSize, self.tagSize)
+        lastScores = torch.gather(scoresRecord, 1, seqLens.view(batchSize, 1, 1).expand(batchSize, 1, self.label_size) - 1).view(batchSize, self.label_size)  ##select position
+        lastScores += self.transitions[:, self.end_idx].view(1, self.label_size).expand(batchSize, self.label_size)
         decodeIdx[:, 0] = torch.argmax(lastScores, 1)
         bestScores = torch.gather(lastScores, 1, decodeIdx[:, 0].view(batchSize, 1))
 
         for distance2Last in range(features.shape[1] - 1):
-            lastNIdxRecord = torch.gather(idxRecord, 1, torch.where(seqLens - distance2Last - 1 > 0, seqLens - distance2Last - 1, mask).view(batchSize, 1, 1).expand(batchSize, 1, self.tagSize)).view(batchSize, self.tagSize)
+            lastNIdxRecord = torch.gather(idxRecord, 1, torch.where(seqLens - distance2Last - 1 > 0, seqLens - distance2Last - 1, mask).view(batchSize, 1, 1).expand(batchSize, 1, self.label_size)).view(batchSize, self.label_size)
             decodeIdx[:, distance2Last + 1] = torch.gather(lastNIdxRecord, 1, decodeIdx[:, distance2Last].view(batchSize, 1)).view(batchSize)
 
         return bestScores, decodeIdx

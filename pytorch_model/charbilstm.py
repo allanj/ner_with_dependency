@@ -9,35 +9,22 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 class CharBiLSTM(nn.Module):
 
-    # def __init__(self, config):
-    #     super(CharBiLSTM, self).__init__()
-    #     print("[Info] Building character-level LSTM")
-    #     self.char_emb_size = config.char_emb_size
-    #     self.char2idx = config.char2idx
-    #     self.chars = config.idx2char
-    #     self.char_size = len(self.chars)
-    #     self.device = config.device
-    #     self.hidden = config.charlstm_hidden_dim
-    #
-    #     self.char_embeddings = nn.Embedding(self.char_size, self.char_emb_size)
-    #     self.char_embeddings.weight.data.copy_(torch.from_numpy(self.random_embedding(self.char_size, self.char_emb_size)))
-    #     self.char_embeddings = self.char_embeddings.to(self.device)
-    #
-    #     self.char_lstm = nn.LSTM(self.char_emb_size, self.hidden//2,num_layers=1, batch_first=True, bidirectional=True).to(self.device)
-
-    def __init__(self):
+    def __init__(self, config):
         super(CharBiLSTM, self).__init__()
         print("[Info] Building character-level LSTM")
-        self.char_emb_size = 25
-        self.char_size = 47
-        self.device = torch.device("cpu")
-        self.hidden = 50
+        self.char_emb_size = config.char_emb_size
+        self.char2idx = config.char2idx
+        self.chars = config.idx2char
+        self.char_size = len(self.chars)
+        self.device = config.device
+        self.hidden = config.charlstm_hidden_dim
 
         self.char_embeddings = nn.Embedding(self.char_size, self.char_emb_size)
         self.char_embeddings.weight.data.copy_(torch.from_numpy(self.random_embedding(self.char_size, self.char_emb_size)))
         self.char_embeddings = self.char_embeddings.to(self.device)
 
         self.char_lstm = nn.LSTM(self.char_emb_size, self.hidden//2,num_layers=1, batch_first=True, bidirectional=True).to(self.device)
+
 
     def random_embedding(self, vocab_size, embedding_dim):
         pretrain_emb = np.empty([vocab_size, embedding_dim])
