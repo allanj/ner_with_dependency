@@ -4,7 +4,8 @@
 
 import numpy as np
 from tqdm import tqdm
-
+from typing import List
+from common.instance import Instance
 
 class Config:
     def __init__(self, args):
@@ -212,33 +213,33 @@ class Config:
                         if next_entity.startswith(self.O) or next_entity.startswith(self.B):
                             output[pos] = curr_entity.replace(self.I, self.E)
 
-    def map_insts_ids(self, insts):
+    def map_insts_ids(self, insts: List[Instance]):
+        insts_ids = []
         for inst in insts:
             words = inst.input.words
-            inst.input.word_ids = []
-            inst.input.char_ids = []
-            inst.input.dep_label_ids = []
+            inst.word_ids = []
+            inst.char_ids = []
+            inst.dep_label_ids = []
+            inst.output_ids = []
             for word in words:
                 if word in self.word2idx:
-                    inst.input.word_ids.append(self.word2idx[word])
+                    inst.word_ids.append(self.word2idx[word])
                 else:
-                    inst.input.word_ids.append(self.word2idx[self.unk])
+                    inst.word_ids.append(self.word2idx[self.unk])
                 char_id = []
                 for c in word:
                     if c in self.char2idx:
                         char_id.append(self.char2idx[c])
                     else:
                         char_id.append(self.char2idx[self.unk])
-                inst.input.char_ids.append(char_id)
+                inst.char_ids.append(char_id)
             for label in inst.input.dep_labels:
-                inst.input.dep_label_ids.append(self.deplabel2idx[label])
-        #     for label in output:
-        #         label_ids.append(self.label2idx[label])
-        #     insts_ids.append([word_ids, char_ids, label_ids])
-        #     word_ids = []
-        #     char_ids = []
-        #     label_ids = []
-        # return insts_ids
+                inst.dep_label_ids.append(self.deplabel2idx[label])
+
+            for label in inst.output:
+                inst.output_ids.append(self.label2idx[label])
+            insts_ids.append([inst.word_ids, inst.char_ids, inst.output_ids])
+        return insts_ids
 
 
     # def map_word_to_ids_in_insts(self, insts):

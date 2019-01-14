@@ -1,11 +1,10 @@
 import numpy as np
 import dynet as dy
-
+import torch
 
 START = "<START>"
 STOP = "<STOP>"
 
-import torch
 
 def log_sum_exp(scores, num_labels):
     max_score_expr = dy.max_dim(scores)
@@ -18,8 +17,6 @@ def log_sum_exp(scores, num_labels):
     return max_score_expr + dy.log(dy.sum_dim(dy.exp(scores - max_score_expr_broadcast), [0]))
 
 
-
-
 def log_sum_exp_pytorch(vec):
     """
 
@@ -30,7 +27,6 @@ def log_sum_exp_pytorch(vec):
     maxScores[maxScores == -float("Inf")] = 0
     maxScoresExpanded = maxScores.view(vec.shape[0] ,1 , vec.shape[1]).expand(vec.shape[0], vec.shape[1], vec.shape[2])
     return maxScores + torch.log(torch.sum(torch.exp(vec - maxScoresExpanded), 1))
-
 
 
 def batchify(config, all_inputs):
@@ -53,9 +49,9 @@ def batchify(config, all_inputs):
     labels = [sent[2] for sent in all_inputs]
     word_seq_lengths = torch.LongTensor(list(map(len, words)))
     max_seq_len = word_seq_lengths.max().item()
-    word_seq_tensor = torch.zeros(batch_size, max_seq_len).long().to(config.device)
-    label_seq_tensor = torch.zeros(batch_size, max_seq_len).long().to(config.device)
-    mask = torch.zeros(batch_size, max_seq_len).byte().to(config.device)
+    word_seq_tensor = torch.zeros(batch_size, max_seq_len).long()
+    label_seq_tensor = torch.zeros(batch_size, max_seq_len).long()
+    mask = torch.zeros(batch_size, max_seq_len).byte()
     for idx, (seq, label, seqlen) in enumerate(zip(words, labels, word_seq_lengths)):
         seqlen = seqlen.item()
         word_seq_tensor[idx, :seqlen] = torch.LongTensor(seq)
@@ -63,7 +59,6 @@ def batchify(config, all_inputs):
         mask[idx, :seqlen] = torch.Tensor([1] * seqlen)
     word_seq_lengths, word_perm_idx = word_seq_lengths.sort(0, descending=True)
     word_seq_tensor = word_seq_tensor[word_perm_idx]
-
     label_seq_tensor = label_seq_tensor[word_perm_idx]
     mask = mask[word_perm_idx]
     ### deal with char
@@ -71,7 +66,7 @@ def batchify(config, all_inputs):
     pad_chars = [chars[idx] + [[0]] * (max_seq_len - len(chars[idx])) for idx in range(len(chars))]
     length_list = [list(map(len, pad_char)) for pad_char in pad_chars]
     max_word_len = max(map(max, length_list))
-    char_seq_tensor = torch.zeros((batch_size, max_seq_len, max_word_len), requires_grad=if_train).long()
+    char_seq_tensor = torch.zeros(batch_size, max_seq_len, max_word_len).long()
     char_seq_lengths = torch.LongTensor(length_list)
     for idx, (seq, seqlen) in enumerate(zip(pad_chars, char_seq_lengths)):
         for idy, (word, wordlen) in enumerate(zip(seq, seqlen)):
@@ -84,14 +79,22 @@ def batchify(config, all_inputs):
     char_seq_tensor = char_seq_tensor[char_perm_idx]
     _, char_seq_recover = char_perm_idx.sort(0, descending=False)
     _, word_seq_recover = word_perm_idx.sort(0, descending=False)
-    if gpu:
-        word_seq_tensor = word_seq_tensor.cuda()
-        for idx in range(feature_num):
-            feature_seq_tensors[idx] = feature_seq_tensors[idx].cuda()
-        word_seq_lengths = word_seq_lengths.cuda()
-        word_seq_recover = word_seq_recover.cuda()
-        label_seq_tensor = label_seq_tensor.cuda()
-        char_seq_tensor = char_seq_tensor.cuda()
-        char_seq_recover = char_seq_recover.cuda()
-        mask = mask.cuda()
-    return word_seq_tensor, feature_seq_tensors, word_seq_lengths, word_seq_recover, char_seq_tensor, char_seq_lengths, char_seq_recover, label_seq_tensor, mask
+
+    word_seq_tensor = word_seq_tensor.to(config.device)
+    word_seq_lengths = word_seq_lengths.to(config.device)
+    word_seq_recover = word_seq_recover.to(config.device)
+    label_seq_tensor = label_seq_tensor.to(config.device)
+    char_seq_tensor = char_seq_tensor.to(config.device)
+    char_seq_recover = char_seq_recover.to(config.device)
+    mask = mask.to(config.device)
+    return word_seq_tensor, word_seq_lengths, word_seq_recover, char_seq_tensor, char_seq_lengths, char_seq_recover, label_seq_tensor, mask
+
+
+
+
+def lr_decay(config, optimizer, epoch):
+    lr = config.learning_rate / (1 + config.lr_decay * (epoch - 1))
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+    print('learning rate is set to: ', lr)
+    return optimizer

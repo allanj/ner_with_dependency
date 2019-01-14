@@ -6,7 +6,7 @@ from typing import List
 
 class Sentence:
 
-    def __init__(self, words, heads: List[int]=None , dep_labels: List[str]=None, pos_tags:List[str] = None):
+    def __init__(self, words: List[str], heads: List[int]=None , dep_labels: List[str]=None, pos_tags:List[str] = None):
         self.words = words
         self.heads = heads
         self.dep_labels = dep_labels
