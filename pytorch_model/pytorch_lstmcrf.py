@@ -16,7 +16,7 @@ class NNCRF(nn.Module):
 
         self.label_size = config.label_size
         self.device = config.device
-        self.use_char = config.use_char
+        self.use_char = config.use_char_rnn
         init_transition = torch.randn(self.label_size, self.label_size).to(self.device)
         self.label2idx = config.label2idx
         self.labels = config.idx2labels
@@ -38,7 +38,7 @@ class NNCRF(nn.Module):
         self.word_embedding.weight.data.copy_(torch.from_numpy(config.word_embedding))
         self.word_drop = nn.Dropout(config.dropout).to(self.device)
 
-        self.lstm = nn.LSTM(self.input_size, config.hidden_dim, num_layers=1, batch_first=True, bidirectional=True).to(self.device)
+        self.lstm = nn.LSTM(self.input_size, config.hidden_dim // 2, num_layers=1, batch_first=True, bidirectional=True).to(self.device)
         self.hidden2tag = nn.Linear(config.hidden_dim, self.label_size).to(self.device)
 
     def neural_scoring(self, words, word_seq_lens, char_inputs, char_seq_lens, char_seq_recover):
@@ -74,7 +74,7 @@ class NNCRF(nn.Module):
     def calculate_all_scores(self, features):
         batch_size = features.size(0)
         seq_len = features.size(1)
-        scores = self.transitions.view(1, 1, self.label_size, self.label_size).expand(batch_size, seq_len, self.label_size, self.label_size) + \
+        scores = self.transition.view(1, 1, self.label_size, self.label_size).expand(batch_size, seq_len, self.label_size, self.label_size) + \
                     features.view(batch_size,seq_len, 1, self.label_size).expand(batch_size,seq_len,self.label_size, self.label_size)
         return scores
 
@@ -113,7 +113,7 @@ class NNCRF(nn.Module):
         tagTransScoresMiddle = torch.gather(currentTagScores[:, 1:, :], 2, tags[:, : sentLength - 1].view(batchSize, sentLength - 1, 1)).view(batchSize, -1)
         tagTransScoresBegin = currentTagScores[:, 0, self.start_idx]
         endTagIds = torch.gather(tags, 1, word_seq_lens.view(batchSize, 1) - 1)
-        tagTransScoresEnd = torch.gather(self.transitions[:, self.end_idx].view(1, self.label_size).expand(batchSize, self.label_size), 1,  endTagIds).view(batchSize)
+        tagTransScoresEnd = torch.gather(self.transition[:, self.end_idx].view(1, self.label_size).expand(batchSize, self.label_size), 1,  endTagIds).view(batchSize)
 
         return torch.sum(tagTransScoresBegin) + torch.sum(tagTransScoresMiddle.masked_select(masks[:, 1:])) + torch.sum(
             tagTransScoresEnd)
@@ -125,35 +125,42 @@ class NNCRF(nn.Module):
         labeled_score = self.forward_labeled(all_scores, word_seq_lens, tags, masks)
         return unlabed_score - labeled_score
 
-    def viterbiDecode(self, features, seqLens):
-        batchSize = len(features)
-        scoresRecord = torch.zeros([batchSize, features.shape[1], self.label_size]).to(self.device)
-        idxRecord = torch.zeros([batchSize, features.shape[1], self.label_size], dtype=torch.int64).to(self.device)
-        mask = torch.ones_like(seqLens, dtype=torch.int64).to(self.device)
+    def viterbiDecode(self, all_scores, word_seq_lens):
+        batchSize = all_scores.shape[0]
+        sentLength = all_scores.shape[1]
+        # sent_len =
+        scoresRecord = torch.zeros([batchSize, sentLength, self.label_size]).to(self.device)
+        idxRecord = torch.zeros([batchSize, sentLength, self.label_size], dtype=torch.int64).to(self.device)
+        mask = torch.ones_like(word_seq_lens, dtype=torch.int64).to(self.device)
         startIds = torch.full((batchSize, self.label_size), self.start_idx, dtype=torch.int64).to(self.device)
-        decodeIdx = torch.LongTensor(batchSize, features.shape[1]).to(self.device)
+        decodeIdx = torch.LongTensor(batchSize, sentLength).to(self.device)
 
-        scores = self.transitions.view(1, 1, self.label_size, self.label_size).expand(
-            batchSize, features.shape[1], self.label_size, self.label_size) + \
-                 features.view(batchSize, features.shape[1], 1, self.label_size).expand(batchSize, features.shape[1],
-                                                                                     self.label_size, self.label_size)
+        scores = all_scores
         # scoresRecord[:, 0, :] = self.getInitAlphaWithBatchSize(batchSize).view(batchSize, self.label_size)
         scoresRecord[:, 0, :] = scores[:, 0, self.start_idx, :]  ## represent the best current score from the start, is the best
         idxRecord[:,  0, :] = startIds
-        for wordIdx in range(1, features.shape[1]):
+        for wordIdx in range(1, sentLength):
             ### scoresIdx: batch x from_label x to_label at current index.
             scoresIdx = scoresRecord[:, wordIdx - 1, :].view(batchSize, self.label_size, 1).expand(batchSize, self.label_size,
                                                                                   self.label_size) + scores[:, wordIdx, :, :]
             idxRecord[:, wordIdx, :] = torch.argmax(scoresIdx, 1)  ## the best previous label idx to crrent labels
             scoresRecord[:, wordIdx, :] = torch.gather(scoresIdx, 1, idxRecord[:, wordIdx, :].view(batchSize, 1, self.label_size)).view(batchSize, self.label_size)
 
-        lastScores = torch.gather(scoresRecord, 1, seqLens.view(batchSize, 1, 1).expand(batchSize, 1, self.label_size) - 1).view(batchSize, self.label_size)  ##select position
-        lastScores += self.transitions[:, self.end_idx].view(1, self.label_size).expand(batchSize, self.label_size)
+        lastScores = torch.gather(scoresRecord, 1, word_seq_lens.view(batchSize, 1, 1).expand(batchSize, 1, self.label_size) - 1).view(batchSize, self.label_size)  ##select position
+        lastScores += self.transition[:, self.end_idx].view(1, self.label_size).expand(batchSize, self.label_size)
         decodeIdx[:, 0] = torch.argmax(lastScores, 1)
         bestScores = torch.gather(lastScores, 1, decodeIdx[:, 0].view(batchSize, 1))
 
-        for distance2Last in range(features.shape[1] - 1):
-            lastNIdxRecord = torch.gather(idxRecord, 1, torch.where(seqLens - distance2Last - 1 > 0, seqLens - distance2Last - 1, mask).view(batchSize, 1, 1).expand(batchSize, 1, self.label_size)).view(batchSize, self.label_size)
+        for distance2Last in range(sentLength - 1):
+            lastNIdxRecord = torch.gather(idxRecord, 1, torch.where(word_seq_lens - distance2Last - 1 > 0, word_seq_lens - distance2Last - 1, mask).view(batchSize, 1, 1).expand(batchSize, 1, self.label_size)).view(batchSize, self.label_size)
             decodeIdx[:, distance2Last + 1] = torch.gather(lastNIdxRecord, 1, decodeIdx[:, distance2Last].view(batchSize, 1)).view(batchSize)
 
+        return bestScores, decodeIdx
+
+    def decode(self, batchInput):
+        wordSeqTensor, wordSeqLengths, _, charSeqTensor, charSeqLengths, char_seq_recover, tagSeqTensor, _ = batchInput
+        features = self.neural_scoring(wordSeqTensor, wordSeqLengths,charSeqTensor,charSeqLengths, char_seq_recover)
+        all_scores = self.calculate_all_scores(features)
+        bestScores, decodeIdx = self.viterbiDecode(all_scores, wordSeqLengths)
+        # print(bestScores, decodeIdx)
         return bestScores, decodeIdx

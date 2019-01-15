@@ -6,6 +6,7 @@ import numpy as np
 from tqdm import tqdm
 from typing import List
 from common.instance import Instance
+import torch
 
 class Config:
     def __init__(self, args):
@@ -31,12 +32,19 @@ class Config:
 
         self.dataset = args.dataset
 
-        self.train_file = "data/"+self.dataset+"/train.conllx"
-        self.dev_file = "data/"+self.dataset+"/dev.conllx"
+        self.train_file = "data/" + self.dataset + "/train.conllx"
+        self.dev_file = "data/" + self.dataset + "/train.conllx"
         ## following datasets do not have development set
         if self.dataset in ("abc", "cnn", "mnb", "nbc", "p25", "pri", "voa"):
             self.dev_file = "data/" + self.dataset + "/test.conllx"
-        self.test_file = "data/"+self.dataset+"/test.conllx"
+        self.test_file = "data/" + self.dataset + "/train.conllx"
+
+        # self.train_file = "data/" + self.dataset + "/debug.conllx"
+        # self.dev_file = "data/" + self.dataset + "/debug.conllx"
+        # ## following datasets do not have development set
+        # if self.dataset in ("abc", "cnn", "mnb", "nbc", "p25", "pri", "voa"):
+        #     self.dev_file = "data/" + self.dataset + "/test.conllx"
+        # self.test_file = "data/" + self.dataset + "/debug.conllx"
         self.label2idx = {}
         self.idx2labels = []
         self.char2idx = {}
@@ -50,13 +58,15 @@ class Config:
         self.l2 = args.l2
         self.num_epochs = args.num_epochs
         # self.lr_decay = 0.05
-        self.batch_size = 10
         self.use_dev = True
         self.train_num = args.train_num
         self.dev_num = args.dev_num
         self.test_num = args.test_num
         self.batch_size = args.batch_size
         self.eval_freq = args.eval_freq
+        self.clip = 5
+        self.lr_decay = args.lr_decay
+        self.device = torch.device(args.device)
 
         self.hidden_dim = args.hidden_dim
         # self.tanh_hidden_dim = args.tanh_hidden_dim
@@ -131,7 +141,9 @@ class Config:
         self.unk_id = 1
         self.idx2word.append(self.unk)
 
-        self.char2idx[self.unk] = 0
+        self.char2idx[self.PAD] = 0
+        self.idx2char.append(self.PAD)
+        self.char2idx[self.unk] = 1
         self.idx2char.append(self.unk)
 
         for word in train_vocab:
@@ -152,7 +164,7 @@ class Config:
                         self.idx2char.append(c)
         self.num_char = len(self.idx2char)
         # print(self.word2idx)
-        #print(self.char2idx)
+        # print(self.char2idx)
 
         if self.embedding is not None:
             print("[Info] Use the pretrained word embedding to initialize: %d x %d" % (len(self.word2idx), self.embedding_dim))
