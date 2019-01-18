@@ -14,8 +14,7 @@ class Reader:
 
     def __init__(self, digit2zero:bool=True):
         self.digit2zero = digit2zero
-        self.train_vocab = {}
-        self.test_vocab = {}
+        self.vocab = set()
 
     def read_conll(self, file: str, number: int = -1, is_train: bool = True) -> List[Instance]:
         print("Reading file: " + file)
@@ -54,10 +53,41 @@ class Reader:
                 heads.append(int(head) if "conll2003" in file else head - 1) ## because of 0-indexed.
                 deps.append(dep_label)
                 tags.append(pos)
-                if is_train:
-                    self.train_vocab[word]=0
+                self.vocab.add(word)
+                labels.append(label)
+        print("number of sentences: {}".format(len(insts)))
+        return insts
+
+    def read_txt(self, file: str, number: int = -1, is_train: bool = True) -> List[Instance]:
+        print("Reading file: " + file)
+        insts = []
+        # vocab = set() ## build the vocabulary
+        with open(file, 'r', encoding='utf-8') as f:
+            words = []
+            labels = []
+            tags = []
+            for line in tqdm(f.readlines()):
+                line = line.rstrip()
+                if line == "":
+                    insts.append(Instance(Sentence(words, None, None, tags), labels))
+                    words = []
+                    labels = []
+                    tags = []
+                    if len(insts) == number:
+                        break
+                    continue
+                if "conll2003" in file:
+                    word, pos, label = line.split()
                 else:
-                    self.test_vocab[word]=0
+                    vals = line.split()
+                    word = vals[1]
+                    pos = vals[3]
+                    label = vals[10]
+                if self.digit2zero:
+                    word = re.sub('\d', '0', word) # replace digit with 0.
+                words.append(word)
+                tags.append(pos)
+                self.vocab.add(word)
                 labels.append(label)
         print("number of sentences: {}".format(len(insts)))
         return insts

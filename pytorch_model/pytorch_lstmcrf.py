@@ -5,7 +5,7 @@
 import torch
 import torch.nn as nn
 
-from config.utils import START, STOP, log_sum_exp_pytorch
+from config.utils import START, STOP, PAD, log_sum_exp_pytorch, logSumExp
 from pytorch_model.charbilstm import CharBiLSTM
 from torch.nn.utils.rnn import  pack_padded_sequence, pad_packed_sequence
 
@@ -17,16 +17,13 @@ class NNCRF(nn.Module):
         self.label_size = config.label_size
         self.device = config.device
         self.use_char = config.use_char_rnn
-        init_transition = torch.randn(self.label_size, self.label_size).to(self.device)
+
         self.label2idx = config.label2idx
         self.labels = config.idx2labels
         self.start_idx = self.label2idx[START]
         self.end_idx = self.label2idx[STOP]
+        self.pad_idx = self.label2idx[PAD]
 
-        init_transition[:, self.start_idx] = -10000.0
-        init_transition[self.end_idx, :] = -10000.0
-
-        self.transition = nn.Parameter(init_transition)
 
         self.input_size = config.embedding_dim
         if self.use_char:
@@ -34,48 +31,61 @@ class NNCRF(nn.Module):
             self.input_size += config.charlstm_hidden_dim
 
         vocab_size = len(config.word2idx)
-        self.word_embedding = nn.Embedding(vocab_size, config.embedding_dim).to(self.device)
-        self.word_embedding.weight.data.copy_(torch.from_numpy(config.word_embedding))
+        # self.word_embedding = nn.Embedding(vocab_size, config.embedding_dim).to(self.device)
+        self.word_embedding = nn.Embedding.from_pretrained(torch.FloatTensor(config.word_embedding), freeze=False).to(self.device)
+        # self.word_embedding.weight.data.copy_(torch.from_numpy(config.word_embedding))
         self.word_drop = nn.Dropout(config.dropout).to(self.device)
+
+
 
         self.lstm = nn.LSTM(self.input_size, config.hidden_dim // 2, num_layers=1, batch_first=True, bidirectional=True).to(self.device)
         self.hidden2tag = nn.Linear(config.hidden_dim, self.label_size).to(self.device)
+        self.drop_lstm = nn.Dropout(config.dropout).to(self.device)
 
-    def neural_scoring(self, words, word_seq_lens, char_inputs, char_seq_lens, char_seq_recover):
+        init_transition = torch.randn(self.label_size, self.label_size).to(self.device)
+        init_transition[:, self.start_idx] = -10000.0
+        init_transition[self.end_idx, :] = -10000.0
+        init_transition[:, self.pad_idx] = -10000.0
+        init_transition[self.pad_idx, :] = -10000.0
+
+        self.transition = nn.Parameter(init_transition)
+
+
+    def neural_scoring(self, word_seq_tensor, word_seq_lens, char_inputs, char_seq_lens):
         """
-        :param words: (batch_size, sent_len)
+        :param word_seq_tensor: (batch_size, sent_len)   NOTE: The word seq actually is already ordered before come here.
         :param word_seq_lens: (batch_size, 1)
         :param chars: (batch_size * sent_len * word_length)
         :param char_seq_lens: numpy (batch_size * sent_len , 1)
-        :param char_seq_recover: variable which records the char order information, used to recover char order
         :return: emission scores (batch_size, sent_len, hidden_dim)
         """
-        batch_size = words.size(0)
-        sent_len = words.size(1)
+        batch_size = word_seq_tensor.size(0)
+        sent_len = word_seq_tensor.size(1)
 
-        word_emb = self.word_embedding(words)
+        word_emb = self.word_embedding(word_seq_tensor)
         if self.use_char:
             char_features = self.char_feature.get_last_hiddens(char_inputs, char_seq_lens)
-            char_features = char_features[char_seq_recover]
-            char_features = char_features.view(batch_size, sent_len, -1)
             word_emb = torch.cat([word_emb, char_features], 2)
         word_rep = self.word_drop(word_emb)
 
-        packed_words = pack_padded_sequence(word_rep, word_seq_lens, True)
+        sorted_seq_len, permIdx = word_seq_lens.sort(0, descending=True)
+        _, recover_idx = permIdx.sort(0, descending=False)
+        sorted_seq_tensor = word_rep[permIdx]
+
+        packed_words = pack_padded_sequence(sorted_seq_tensor, sorted_seq_len, True)
         lstm_out, _ = self.lstm(packed_words, None)
-        lstm_out, _ = pad_packed_sequence(lstm_out)
-        ## lstm_out, (seq_len, batch_size, hidden_size)
-        lstm_out = lstm_out.transpose(1,0)
-        outputs = self.hidden2tag(lstm_out)
+        lstm_out, _ = pad_packed_sequence(lstm_out, batch_first=True)  ## CARE: make sure here is batch_first, otherwise need to transpose.
+        feature_out = self.drop_lstm(lstm_out)
+        ### TODO: dropout this lstm output or not, because ABB code do dropout.
+        outputs = self.hidden2tag(feature_out)
 
-        return outputs
-
+        return outputs[recover_idx]
 
     def calculate_all_scores(self, features):
         batch_size = features.size(0)
         seq_len = features.size(1)
         scores = self.transition.view(1, 1, self.label_size, self.label_size).expand(batch_size, seq_len, self.label_size, self.label_size) + \
-                    features.view(batch_size,seq_len, 1, self.label_size).expand(batch_size,seq_len,self.label_size, self.label_size)
+                    features.view(batch_size, seq_len, 1, self.label_size).expand(batch_size,seq_len,self.label_size, self.label_size)
         return scores
 
     def forward_unlabeled(self, all_scores, word_seq_lens, masks):
@@ -108,7 +118,7 @@ class NNCRF(nn.Module):
         batchSize = all_scores.shape[0]
         sentLength = all_scores.shape[1]
 
-        ## all the scores to current labels: batch, seq_len, label_size
+        ## all the scores to current labels: batch, seq_len, all_from_label?
         currentTagScores = torch.gather(all_scores, 3, tags.view(batchSize, sentLength, 1, 1).expand(batchSize, sentLength, self.label_size, 1)).view(batchSize, -1, self.label_size)
         tagTransScoresMiddle = torch.gather(currentTagScores[:, 1:, :], 2, tags[:, : sentLength - 1].view(batchSize, sentLength - 1, 1)).view(batchSize, -1)
         tagTransScoresBegin = currentTagScores[:, 0, self.start_idx]
@@ -118,12 +128,21 @@ class NNCRF(nn.Module):
         return torch.sum(tagTransScoresBegin) + torch.sum(tagTransScoresMiddle.masked_select(masks[:, 1:])) + torch.sum(
             tagTransScoresEnd)
 
-    def neg_log_obj(self, words, word_seq_lens, chars, char_seq_lens, char_seq_recover, masks, tags):
-        features = self.neural_scoring(words, word_seq_lens, chars, char_seq_lens, char_seq_recover)
+
+    def neg_log_obj(self, words, word_seq_lens, chars, char_seq_lens, tags):
+        features = self.neural_scoring(words, word_seq_lens, chars, char_seq_lens)
         all_scores = self.calculate_all_scores(features)
-        unlabed_score = self.forward_unlabeled(all_scores, word_seq_lens, masks)
-        labeled_score = self.forward_labeled(all_scores, word_seq_lens, tags, masks)
+
+        batch_size = words.size(0)
+        sent_len = words.size(1)
+
+        maskTemp = torch.arange(1, sent_len + 1, dtype=torch.long).view(1, sent_len).expand(batch_size, sent_len).to(self.device)
+        mask = torch.le(maskTemp, word_seq_lens.view(batch_size, 1).expand(batch_size, sent_len)).to(self.device)
+
+        unlabed_score = self.forward_unlabeled(all_scores, word_seq_lens, mask)
+        labeled_score = self.forward_labeled(all_scores, word_seq_lens, tags, mask)
         return unlabed_score - labeled_score
+
 
     def viterbiDecode(self, all_scores, word_seq_lens):
         batchSize = all_scores.shape[0]
@@ -158,9 +177,8 @@ class NNCRF(nn.Module):
         return bestScores, decodeIdx
 
     def decode(self, batchInput):
-        wordSeqTensor, wordSeqLengths, _, charSeqTensor, charSeqLengths, char_seq_recover, tagSeqTensor, _ = batchInput
-        features = self.neural_scoring(wordSeqTensor, wordSeqLengths,charSeqTensor,charSeqLengths, char_seq_recover)
+        wordSeqTensor, wordSeqLengths, charSeqTensor, charSeqLengths, tagSeqTensor = batchInput
+        features = self.neural_scoring(wordSeqTensor, wordSeqLengths,charSeqTensor,charSeqLengths)
         all_scores = self.calculate_all_scores(features)
         bestScores, decodeIdx = self.viterbiDecode(all_scores, wordSeqLengths)
-        # print(bestScores, decodeIdx)
         return bestScores, decodeIdx

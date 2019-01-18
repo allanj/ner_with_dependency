@@ -1,9 +1,12 @@
 import numpy as np
 # import dynet as dy
 import torch
+from typing import List
+from common.instance import Instance
 
 START = "<START>"
 STOP = "<STOP>"
+PAD = "<PAD>"
 
 
 # def log_sum_exp(scores, num_labels):
@@ -21,7 +24,7 @@ def log_sum_exp_pytorch(vec):
     """
 
     :param vec: [batchSize * from_label * to_label]
-    :return: [batchSize * tagSize]
+    :return: [batchSize * to_label]
     """
     maxScores, idx = torch.max(vec, 1)
     maxScores[maxScores == -float("Inf")] = 0
@@ -29,10 +32,23 @@ def log_sum_exp_pytorch(vec):
     return maxScores + torch.log(torch.sum(torch.exp(vec - maxScoresExpanded), 1))
 
 
-def batchify(config, all_inputs):
+def logSumExp(vec):
+    """
+
+    :param vec: [batchSize * tagSize * tagSize]
+    :return: [batchSize * tagSize]
+    """
+    maxScores, idx = torch.max(vec, 2)
+    maxScores[maxScores == -float("Inf")] = 0
+    maxScoresExpanded = maxScores.view(vec.shape[0], vec.shape[1], 1).expand(vec.shape[0], vec.shape[1], vec.shape[2])
+    return maxScores + torch.log(torch.sum(torch.exp(vec - maxScoresExpanded), 2))
+
+
+
+def batchify(config, inputs):
     """
     Batchify the all the instances ids.
-    :param all_inputs:  [[words,chars, labels],[words,chars,labels],...]
+    :param inputs:  [[words,chars, labels],[words,chars,labels],...]
     :return:
         zero paddding for word, char, and batch length
         word_seq: batch_size x max_sent_len
@@ -43,10 +59,10 @@ def batchify(config, all_inputs):
         label_seq_tensor: batch_size, max_sent_len
         mask: batch_size, max_sent_len
     """
-    batch_size = len(all_inputs)
-    words = [sent[0] for sent in all_inputs] ## word ids.
-    chars = [sent[1] for sent in all_inputs]
-    labels = [sent[2] for sent in all_inputs]
+    batch_size = len(inputs)
+    words = [sent[0] for sent in inputs] ## word ids.
+    chars = [sent[1] for sent in inputs]
+    labels = [sent[2] for sent in inputs]
     word_seq_lengths = torch.LongTensor(list(map(len, words)))
     max_seq_len = word_seq_lengths.max().item()
     word_seq_tensor = torch.zeros(batch_size, max_seq_len).long()
@@ -87,7 +103,52 @@ def batchify(config, all_inputs):
     char_seq_tensor = char_seq_tensor.to(config.device)
     char_seq_recover = char_seq_recover.to(config.device)
     mask = mask.to(config.device)
+    # print("word, ", word_seq_tensor[0])
+
+    # print("char", char_seq_tensor[0])
     return word_seq_tensor, word_seq_lengths, word_seq_recover, char_seq_tensor, char_seq_lengths, char_seq_recover, label_seq_tensor, mask
+
+
+
+def simple_batching(config, insts: List[Instance]):
+    """
+
+    :param config:
+    :param insts:
+    :return:
+        word_seq_tensor,
+        word_seq_len,
+        char_seq_tensor,
+        char_seq_len,
+        label_seq_tensor
+    """
+    batch_size = len(insts)
+    batch_data = sorted(insts, key=lambda inst: len(inst.input.words), reverse=True)
+    word_seq_len = torch.LongTensor(list(map(lambda inst: len(inst.input.words), batch_data)))
+    max_seq_len = word_seq_len.max()
+    ### TODO: the 1 here might be used later?? We will make this as padding, because later we have to do a deduction.
+    #### Use 1 here because the CharBiLSTM accepts
+    char_seq_len = torch.LongTensor([list(map(len, inst.input.words)) + [1] * (int(max_seq_len) - len(inst.input.words)) for inst in batch_data])
+    max_char_seq_len = char_seq_len.max()
+
+    word_seq_tensor = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
+    label_seq_tensor =  torch.zeros((batch_size, max_seq_len), dtype=torch.long)
+    char_seq_tensor = torch.zeros((batch_size, max_seq_len, max_char_seq_len), dtype=torch.long)
+    for idx in range(batch_size):
+        word_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].word_ids)
+        label_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].output_ids)
+        for word_idx in range(word_seq_len[idx]):
+            char_seq_tensor[idx, word_idx, :char_seq_len[idx, word_idx]] = torch.LongTensor(batch_data[idx].char_ids[word_idx])
+        for wordIdx in range(word_seq_len[idx], max_seq_len):
+            char_seq_tensor[idx, wordIdx, 0: 1] = torch.LongTensor([config.char2idx[PAD]])   ###because line 119 makes it 1, every single character should have a id. but actually 0 is enough
+
+    word_seq_tensor = word_seq_tensor.to(config.device)
+    label_seq_tensor = label_seq_tensor.to(config.device)
+    char_seq_tensor = char_seq_tensor.to(config.device)
+    word_seq_len = word_seq_len.to(config.device)
+    char_seq_len = char_seq_len.to(config.device)
+
+    return word_seq_tensor, word_seq_len, char_seq_tensor, char_seq_len, label_seq_tensor
 
 
 

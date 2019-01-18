@@ -6,20 +6,21 @@ import numpy as np
 from tqdm import tqdm
 from typing import List
 from common.instance import Instance
+from config.utils import PAD, START, STOP
 import torch
 
 class Config:
     def __init__(self, args):
 
-        self.PAD = "<PAD>"
+        self.PAD = PAD
         self.B = "B-"
         self.I = "I-"
         self.S = "S-"
         self.E = "E-"
         self.O = "O"
-        self.START_TAG = "<START>"
-        self.STOP_TAG = "<STOP>"
-        self.unk = "unk"
+        self.START_TAG = START
+        self.STOP_TAG = STOP
+        self.UNK = "<UNK>"
         self.unk_id = -1
 
         # self.device = torch.device("cuda" if args.gpu else "cpu")
@@ -32,12 +33,12 @@ class Config:
 
         self.dataset = args.dataset
 
-        self.train_file = "data/" + self.dataset + "/train.conllx"
-        self.dev_file = "data/" + self.dataset + "/train.conllx"
+        self.train_file = "data/" + self.dataset + "/train.txt"
+        self.dev_file = "data/" + self.dataset + "/dev.txt"
         ## following datasets do not have development set
         if self.dataset in ("abc", "cnn", "mnb", "nbc", "p25", "pri", "voa"):
             self.dev_file = "data/" + self.dataset + "/test.conllx"
-        self.test_file = "data/" + self.dataset + "/train.conllx"
+        self.test_file = "data/" + self.dataset + "/test.txt"
 
         # self.train_file = "data/" + self.dataset + "/debug.conllx"
         # self.dev_file = "data/" + self.dataset + "/debug.conllx"
@@ -73,7 +74,7 @@ class Config:
         self.use_brnn = True
         self.num_layers = 1
         self.dropout = args.dropout
-        self.char_emb_size = 25
+        self.char_emb_size = 30
         self.charlstm_hidden_dim = 50
         self.use_char_rnn = args.use_char_rnn
         self.use_head = args.use_head
@@ -125,47 +126,48 @@ class Config:
         return embedding, embedding_dim
 
 
-    '''
-        build the embedding table
-        obtain the word2idx and idx2word as well.
-    '''
-    def build_emb_table(self, train_vocab, test_vocab):
-        print("Building the embedding table for vocabulary...")
-        scale = np.sqrt(3.0 / self.embedding_dim)
-
+    def build_word_idx(self, train_insts, dev_insts, test_insts):
         self.word2idx = dict()
         self.idx2word = []
         self.word2idx[self.PAD] = 0
         self.idx2word.append(self.PAD)
-        self.word2idx[self.unk] = 1
+        self.word2idx[self.UNK] = 1
         self.unk_id = 1
-        self.idx2word.append(self.unk)
+        self.idx2word.append(self.UNK)
 
         self.char2idx[self.PAD] = 0
         self.idx2char.append(self.PAD)
-        self.char2idx[self.unk] = 1
-        self.idx2char.append(self.unk)
+        self.char2idx[self.UNK] = 1
+        self.idx2char.append(self.UNK)
 
-        for word in train_vocab:
-            self.word2idx[word] = len(self.word2idx)
-            self.idx2word.append(word)
-            for c in word:
-                if c not in self.char2idx:
-                    self.char2idx[c] = len(self.idx2char)
-                    self.idx2char.append(c)
-
-        for word in test_vocab:
-            if word not in self.word2idx:
-                self.word2idx[word] = len(self.word2idx)
-                self.idx2word.append(word)
+        ##extract char on train, dev, test
+        for inst in train_insts + dev_insts + test_insts:
+            for word in inst.input.words:
+                if word not in self.word2idx:
+                    self.word2idx[word] = len(self.word2idx)
+                    self.idx2word.append(word)
+        ##extract char only on train
+        for inst in train_insts:
+            for word in inst.input.words:
                 for c in word:
                     if c not in self.char2idx:
                         self.char2idx[c] = len(self.idx2char)
                         self.idx2char.append(c)
         self.num_char = len(self.idx2char)
-        # print(self.word2idx)
-        # print(self.char2idx)
-
+        # print(self.idx2word)
+        # print(self.idx2char)
+        # for idx, char in enumerate(self.idx2char):
+        #     print(idx, ":", char)
+        # print("separator")
+        # for idx, word in enumerate(self.idx2word):
+        #     print(idx, ":", word)
+    '''
+        build the embedding table
+        obtain the word2idx and idx2word as well.
+    '''
+    def build_emb_table(self):
+        print("Building the embedding table for vocabulary...")
+        scale = np.sqrt(3.0 / self.embedding_dim)
         if self.embedding is not None:
             print("[Info] Use the pretrained word embedding to initialize: %d x %d" % (len(self.word2idx), self.embedding_dim))
             self.word_embedding = np.empty([len(self.word2idx), self.embedding_dim])
@@ -175,8 +177,8 @@ class Config:
                 elif word.lower() in self.embedding:
                     self.word_embedding[self.word2idx[word], :] = self.embedding[word.lower()]
                 else:
-                    self.word_embedding[self.word2idx[word], :] = self.embedding[self.unk]
-                    # self.word_embedding[self.word2idx[word], :] = np.random.uniform(-scale, scale, [1, self.embedding_dim])
+                    # self.word_embedding[self.word2idx[word], :] = self.embedding[self.UNK]
+                    self.word_embedding[self.word2idx[word], :] = np.random.uniform(-scale, scale, [1, self.embedding_dim])
             self.embedding = None
         else:
             self.word_embedding = np.empty([len(self.word2idx), self.embedding_dim])
@@ -192,6 +194,8 @@ class Config:
 
 
     def build_label_idx(self, insts):
+        self.label2idx[self.PAD] = len(self.label2idx)
+        self.idx2labels.append(self.PAD)
         for inst in insts:
             for label in inst.output:
                 if label not in self.label2idx:
@@ -237,16 +241,16 @@ class Config:
                 if word in self.word2idx:
                     inst.word_ids.append(self.word2idx[word])
                 else:
-                    inst.word_ids.append(self.word2idx[self.unk])
+                    inst.word_ids.append(self.word2idx[self.UNK])
                 char_id = []
                 for c in word:
                     if c in self.char2idx:
                         char_id.append(self.char2idx[c])
                     else:
-                        char_id.append(self.char2idx[self.unk])
+                        char_id.append(self.char2idx[self.UNK])
                 inst.char_ids.append(char_id)
-            for label in inst.input.dep_labels:
-                inst.dep_label_ids.append(self.deplabel2idx[label])
+            # for label in inst.input.dep_labels:
+            #     inst.dep_label_ids.append(self.deplabel2idx[label])
 
             for label in inst.output:
                 inst.output_ids.append(self.label2idx[label])
