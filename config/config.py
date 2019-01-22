@@ -33,19 +33,19 @@ class Config:
 
         self.dataset = args.dataset
 
-        self.train_file = "data/" + self.dataset + "/train.txt"
-        self.dev_file = "data/" + self.dataset + "/dev.txt"
-        ## following datasets do not have development set
-        if self.dataset in ("abc", "cnn", "mnb", "nbc", "p25", "pri", "voa"):
-            self.dev_file = "data/" + self.dataset + "/test.conllx"
-        self.test_file = "data/" + self.dataset + "/test.txt"
-
-        # self.train_file = "data/" + self.dataset + "/debug.conllx"
-        # self.dev_file = "data/" + self.dataset + "/debug.conllx"
+        # self.train_file = "data/" + self.dataset + "/train.txt"
+        # self.dev_file = "data/" + self.dataset + "/dev.txt"
         # ## following datasets do not have development set
         # if self.dataset in ("abc", "cnn", "mnb", "nbc", "p25", "pri", "voa"):
         #     self.dev_file = "data/" + self.dataset + "/test.conllx"
-        # self.test_file = "data/" + self.dataset + "/debug.conllx"
+        # self.test_file = "data/" + self.dataset + "/test.txt"
+
+        self.train_file = "data/" + self.dataset + "/train.conllx"
+        self.dev_file = "data/" + self.dataset + "/dev.conllx"
+        ## following datasets do not have development set
+        if self.dataset in ("abc", "cnn", "mnb", "nbc", "p25", "pri", "voa"):
+            self.dev_file = "data/" + self.dataset + "/test.conllx"
+        self.test_file = "data/" + self.dataset + "/test.conllx"
         self.label2idx = {}
         self.idx2labels = []
         self.char2idx = {}
@@ -249,21 +249,14 @@ class Config:
                     else:
                         char_id.append(self.char2idx[self.UNK])
                 inst.char_ids.append(char_id)
-            # for label in inst.input.dep_labels:
-            #     inst.dep_label_ids.append(self.deplabel2idx[label])
-
+            for label in inst.input.dep_labels:
+                inst.dep_label_ids.append(self.deplabel2idx[label])
             for label in inst.output:
                 inst.output_ids.append(self.label2idx[label])
             insts_ids.append([inst.word_ids, inst.char_ids, inst.output_ids])
         return insts_ids
 
 
-    # def map_word_to_ids_in_insts(self, insts):
-    #     for inst in insts:
-    #         words = inst.input.words
-    #         inst.input_ids = []
-    #         for word in words:
-    #             inst.input_ids.append(self.word2idx[word])
 
     def find_singleton(self, train_insts):
         freq = {}

@@ -11,7 +11,7 @@ from pytorch_model.pytorch_lstmcrf import NNCRF
 import torch
 import torch.optim as optim
 import torch.nn as nn
-from config.utils import lr_decay, batchify, simple_batching
+from config.utils import lr_decay, simple_batching
 from typing import List
 from common.instance import Instance
 from termcolor import colored
@@ -32,7 +32,7 @@ def parse_arguments(parser):
     parser.add_argument('--device', type=str, default="cuda:0")
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--digit2zero', action="store_true", default=True)
-    parser.add_argument('--dataset', type=str, default="conll2003")
+    parser.add_argument('--dataset', type=str, default="abc")
     parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
     # parser.add_argument('--embedding_file', type=str, default=None)
     parser.add_argument('--embedding_dim', type=int, default=100)
@@ -41,7 +41,7 @@ def parse_arguments(parser):
     parser.add_argument('--momentum', type=float, default=0.0)
     parser.add_argument('--l2', type=float, default=1e-8)
     parser.add_argument('--lr_decay', type=float, default=0.05)
-    parser.add_argument('--batch_size', type=int, default=10)
+    parser.add_argument('--batch_size', type=int, default=2)
     parser.add_argument('--num_epochs', type=int, default=100)
 
     ##model hyperparameter
@@ -80,79 +80,6 @@ def get_optimizer(config: Config, model: nn.Module):
     else:
         print("Illegal optimizer: {}".format(config.optimizer))
         exit(1)
-
-def batching_instances(config, insts_ids, batch_size):
-    train_num = len(insts_ids)
-    total_batch = train_num // batch_size + 1 if train_num % batch_size != 0 else train_num // batch_size
-    batched_data = []
-    for batch_id in range(total_batch):
-        one_batch_insts = insts_ids[batch_id * batch_size:(batch_id + 1) * batch_size]
-        batched_data.append(batchify(config, one_batch_insts))
-
-    return batched_data
-
-def learn_and_eval(config:Config, epoch: int, train_insts_ids, batch_size, dev_insts_ids, test_insts_ids):
-    # train_insts: List[Instance], dev_insts: List[Instance], test_insts: List[Instance], batch_size: int = 1
-    model = NNCRF(config)
-    optimizer = get_optimizer(config, model)
-    train_num = len(train_insts_ids)
-    print("number of instances: %d" % (train_num))
-    print("[NOT] Shuffle the training instance ids")
-    # random.shuffle(train_insts_ids)
-
-
-
-    batched_data = batching_instances(config, train_insts_ids, batch_size)
-    exit(1)
-    dev_batches = batching_instances(config, dev_insts_ids, batch_size)
-    test_batches = batching_instances(config, test_insts_ids, batch_size)
-
-    best_dev = [-1, 0]
-    best_test = [-1, 0]
-
-    model_name = "models/lstm_{}_{}_crf_{}_{}_head_{}_elmo_{}.m".format(config.hidden_dim, config.second_hidden_size, config.dataset, config.train_num, config.use_head, config.use_elmo)
-    res_name = "results/lstm_{}_{}_crf_{}_{}_head_{}_elmo_{}.results".format(config.hidden_dim, config.second_hidden_size, config.dataset, config.train_num, config.use_head, config.use_elmo)
-    print("[Info] The model will be saved to: %s, please ensure models folder exist" % (model_name))
-
-    for i in range(1, epoch + 1):
-        epoch_loss = 0
-        start_time = time.time()
-        model.zero_grad()
-        if config.optimizer.lower() == "sgd":
-            optimizer = lr_decay(config, optimizer, i)
-        # for index in np.random.permutation(len(batched_data)):
-        for index in range(len(batched_data)):
-            model.train()
-            batch_word, batch_wordlen, batch_wordrecover, batch_char, batch_charlen, batch_charrecover, batch_label, mask = batched_data[index]
-            # print(batch_char)
-            loss = model.neg_log_obj(batch_word, batch_wordlen,batch_char, batch_charlen, batch_charrecover, mask, batch_label)
-            epoch_loss += loss.item()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), config.clip) ##clipping the gradient
-            optimizer.step()
-            model.zero_grad()
-
-        end_time = time.time()
-        print("Epoch %d: %.5f, Time is %.2fs" % (i, epoch_loss, end_time - start_time), flush=True)
-
-        if i + 1 >= config.eval_epoch:
-            model.eval()
-            dev_metrics = evaluate(config, model, dev_batches, "dev")
-            test_metrics = evaluate(config, model, test_batches, "test")
-            if dev_metrics[2] > best_dev[0]:
-                print("saving the best model...")
-                best_dev[0] = dev_metrics[2]
-                best_dev[1] = i
-                best_test[0] = test_metrics[2]
-                best_test[1] = i
-                torch.save(model.state_dict(), model_name)
-            model.zero_grad()
-
-    print("The best dev: %.2f" % (best_dev[0]))
-    print("The corresponding test: %.2f" % (best_test[0]))
-    model.load_state_dict(torch.load(model_name))
-    model.eval()
-    evaluate(config, model, test_batches, "test")
 
 def batching_list_instances(config: Config, insts:List[Instance]):
     train_num = len(insts)
@@ -196,7 +123,7 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
         for index in np.random.permutation(len(batched_data)):
         # for index in range(len(batched_data)):
             model.train()
-            batch_word, batch_wordlen, batch_char, batch_charlen, batch_label = batched_data[index]
+            batch_word, batch_wordlen, batch_char, batch_charlen, adj_matrixs, batch_label = batched_data[index]
             loss = model.neg_log_obj(batch_word, batch_wordlen,batch_char, batch_charlen, batch_label)
             epoch_loss += loss.item()
             loss.backward()

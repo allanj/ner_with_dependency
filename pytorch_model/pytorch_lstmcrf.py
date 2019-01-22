@@ -5,8 +5,9 @@
 import torch
 import torch.nn as nn
 
-from config.utils import START, STOP, PAD, log_sum_exp_pytorch, logSumExp
+from config.utils import START, STOP, PAD, log_sum_exp_pytorch
 from pytorch_model.charbilstm import CharBiLSTM
+from pytorch_model.gcn import GCN
 from torch.nn.utils.rnn import  pack_padded_sequence, pad_packed_sequence
 
 class NNCRF(nn.Module):
@@ -42,6 +43,10 @@ class NNCRF(nn.Module):
         self.hidden2tag = nn.Linear(config.hidden_dim, self.label_size).to(self.device)
         self.drop_lstm = nn.Dropout(config.dropout).to(self.device)
 
+        self.use_head = config.use_head
+        if self.use_head:
+            self.gcn = GCN(config)
+
         init_transition = torch.randn(self.label_size, self.label_size).to(self.device)
         init_transition[:, self.start_idx] = -10000.0
         init_transition[self.end_idx, :] = -10000.0
@@ -51,7 +56,7 @@ class NNCRF(nn.Module):
         self.transition = nn.Parameter(init_transition)
 
 
-    def neural_scoring(self, word_seq_tensor, word_seq_lens, char_inputs, char_seq_lens):
+    def neural_scoring(self, word_seq_tensor, word_seq_lens, char_inputs, char_seq_lens, adj_matrixs):
         """
         :param word_seq_tensor: (batch_size, sent_len)   NOTE: The word seq actually is already ordered before come here.
         :param word_seq_lens: (batch_size, 1)
@@ -77,6 +82,11 @@ class NNCRF(nn.Module):
         lstm_out, _ = pad_packed_sequence(lstm_out, batch_first=True)  ## CARE: make sure here is batch_first, otherwise need to transpose.
         feature_out = self.drop_lstm(lstm_out)
         ### TODO: dropout this lstm output or not, because ABB code do dropout.
+
+        if self.use_head:
+            feature_out = self.gcn(feature_out)
+
+
         outputs = self.hidden2tag(feature_out)
 
         return outputs[recover_idx]
@@ -129,8 +139,10 @@ class NNCRF(nn.Module):
             tagTransScoresEnd)
 
 
-    def neg_log_obj(self, words, word_seq_lens, chars, char_seq_lens, tags):
+    def neg_log_obj(self, words, word_seq_lens, chars, char_seq_lens, adj_matrixs, tags):
         features = self.neural_scoring(words, word_seq_lens, chars, char_seq_lens)
+
+
         all_scores = self.calculate_all_scores(features)
 
         batch_size = words.size(0)

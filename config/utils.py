@@ -9,17 +9,6 @@ STOP = "<STOP>"
 PAD = "<PAD>"
 
 
-# def log_sum_exp(scores, num_labels):
-#     max_score_expr = dy.max_dim(scores)
-#     max_score_expr_broadcast = dy.concatenate([max_score_expr] * num_labels)
-#     # return max_score_expr + dy.log(dy.sum_cols(dy.transpose(dy.exp(scores - max_score_expr_broadcast))))
-#     '''
-#     sum_cols(x) has been deprecated.
-#     Please use sum_dim(x, [1]) instead.
-#     '''
-#     return max_score_expr + dy.log(dy.sum_dim(dy.exp(scores - max_score_expr_broadcast), [0]))
-
-
 def log_sum_exp_pytorch(vec):
     """
 
@@ -30,83 +19,6 @@ def log_sum_exp_pytorch(vec):
     maxScores[maxScores == -float("Inf")] = 0
     maxScoresExpanded = maxScores.view(vec.shape[0] ,1 , vec.shape[2]).expand(vec.shape[0], vec.shape[1], vec.shape[2])
     return maxScores + torch.log(torch.sum(torch.exp(vec - maxScoresExpanded), 1))
-
-
-def logSumExp(vec):
-    """
-
-    :param vec: [batchSize * tagSize * tagSize]
-    :return: [batchSize * tagSize]
-    """
-    maxScores, idx = torch.max(vec, 2)
-    maxScores[maxScores == -float("Inf")] = 0
-    maxScoresExpanded = maxScores.view(vec.shape[0], vec.shape[1], 1).expand(vec.shape[0], vec.shape[1], vec.shape[2])
-    return maxScores + torch.log(torch.sum(torch.exp(vec - maxScoresExpanded), 2))
-
-
-
-def batchify(config, inputs):
-    """
-    Batchify the all the instances ids.
-    :param inputs:  [[words,chars, labels],[words,chars,labels],...]
-    :return:
-        zero paddding for word, char, and batch length
-        word_seq: batch_size x max_sent_len
-        word_seq_lens batch_size ,
-        char_seq: (batch_size * max_sent_len, max_word_len)
-        char_seq_lens: (batch_size * max_sent_len, 1)
-        char_seq_rec: batch_size * max_sent_len, 1
-        label_seq_tensor: batch_size, max_sent_len
-        mask: batch_size, max_sent_len
-    """
-    batch_size = len(inputs)
-    words = [sent[0] for sent in inputs] ## word ids.
-    chars = [sent[1] for sent in inputs]
-    labels = [sent[2] for sent in inputs]
-    word_seq_lengths = torch.LongTensor(list(map(len, words)))
-    max_seq_len = word_seq_lengths.max().item()
-    word_seq_tensor = torch.zeros(batch_size, max_seq_len).long()
-    label_seq_tensor = torch.zeros(batch_size, max_seq_len).long()
-    mask = torch.zeros(batch_size, max_seq_len).byte()
-    for idx, (seq, label, seqlen) in enumerate(zip(words, labels, word_seq_lengths)):
-        seqlen = seqlen.item()
-        word_seq_tensor[idx, :seqlen] = torch.LongTensor(seq)
-        label_seq_tensor[idx, :seqlen] = torch.LongTensor(label)
-        mask[idx, :seqlen] = torch.Tensor([1] * seqlen)
-    word_seq_lengths, word_perm_idx = word_seq_lengths.sort(0, descending=True)
-    word_seq_tensor = word_seq_tensor[word_perm_idx]
-    label_seq_tensor = label_seq_tensor[word_perm_idx]
-    mask = mask[word_perm_idx]
-    ### deal with char
-    # pad_chars (batch_size, max_seq_len)
-    pad_chars = [chars[idx] + [[0]] * (max_seq_len - len(chars[idx])) for idx in range(len(chars))]
-    length_list = [list(map(len, pad_char)) for pad_char in pad_chars]
-    max_word_len = max(map(max, length_list))
-    char_seq_tensor = torch.zeros(batch_size, max_seq_len, max_word_len).long()
-    char_seq_lengths = torch.LongTensor(length_list)
-    for idx, (seq, seqlen) in enumerate(zip(pad_chars, char_seq_lengths)):
-        for idy, (word, wordlen) in enumerate(zip(seq, seqlen)):
-            # print len(word), wordlen
-            char_seq_tensor[idx, idy, :wordlen] = torch.LongTensor(word)
-
-    char_seq_tensor = char_seq_tensor[word_perm_idx].view(batch_size * max_seq_len, -1)
-    char_seq_lengths = char_seq_lengths[word_perm_idx].view(batch_size * max_seq_len, )
-    char_seq_lengths, char_perm_idx = char_seq_lengths.sort(0, descending=True)
-    char_seq_tensor = char_seq_tensor[char_perm_idx]
-    _, char_seq_recover = char_perm_idx.sort(0, descending=False)
-    _, word_seq_recover = word_perm_idx.sort(0, descending=False)
-
-    word_seq_tensor = word_seq_tensor.to(config.device)
-    word_seq_lengths = word_seq_lengths.to(config.device)
-    word_seq_recover = word_seq_recover.to(config.device)
-    label_seq_tensor = label_seq_tensor.to(config.device)
-    char_seq_tensor = char_seq_tensor.to(config.device)
-    char_seq_recover = char_seq_recover.to(config.device)
-    mask = mask.to(config.device)
-    # print("word, ", word_seq_tensor[0])
-
-    # print("char", char_seq_tensor[0])
-    return word_seq_tensor, word_seq_lengths, word_seq_recover, char_seq_tensor, char_seq_lengths, char_seq_recover, label_seq_tensor, mask
 
 
 
@@ -134,6 +46,11 @@ def simple_batching(config, insts: List[Instance]):
     word_seq_tensor = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
     label_seq_tensor =  torch.zeros((batch_size, max_seq_len), dtype=torch.long)
     char_seq_tensor = torch.zeros((batch_size, max_seq_len, max_char_seq_len), dtype=torch.long)
+    adjs = None
+    if config.use_head:
+        adjs = [ head_to_adj(max_seq_len, inst) for inst in batch_data]
+        adjs = np.concatenate(adjs, axis=0)
+        adjs = torch.from_numpy(adjs)
     for idx in range(batch_size):
         word_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].word_ids)
         label_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].output_ids)
@@ -147,9 +64,10 @@ def simple_batching(config, insts: List[Instance]):
     char_seq_tensor = char_seq_tensor.to(config.device)
     word_seq_len = word_seq_len.to(config.device)
     char_seq_len = char_seq_len.to(config.device)
+    if config.use_head:
+        adjs = adjs.to(config.device)
 
-    return word_seq_tensor, word_seq_len, char_seq_tensor, char_seq_len, label_seq_tensor
-
+    return word_seq_tensor, word_seq_len, char_seq_tensor, char_seq_len, adjs, label_seq_tensor
 
 
 
@@ -159,3 +77,25 @@ def lr_decay(config, optimizer, epoch):
         param_group['lr'] = lr
     print('learning rate is set to: ', lr)
     return optimizer
+
+
+
+def head_to_adj(max_len, inst, directed=False, self_loop=False):
+    """
+    Convert a tree object to an (numpy) adjacency matrix.
+    """
+    ret = np.zeros((max_len, max_len), dtype=np.float32)
+
+    for i, head in enumerate(inst.input.heads):
+        if head == -1:
+            continue
+        ret[head, i] = 1
+
+    if not directed:
+        ret = ret + ret.T
+
+    if self_loop:
+        for i in range(len(inst.input.words)):
+            ret[i, i] = 1
+
+    return ret
