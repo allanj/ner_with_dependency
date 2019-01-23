@@ -1,158 +1,195 @@
-import dynet as dy
-from config.utils import log_sum_exp
-import numpy as np
-from model.char_rnn import CharRNN
+# 
+# @author: Allan
+#
 
-START = "<START>"
-STOP = "<STOP>"
+import torch
+import torch.nn as nn
 
+from config.utils import START, STOP, PAD, log_sum_exp_pytorch
+from model.charbilstm import CharBiLSTM
+from model.gcn import GCN
+from torch.nn.utils.rnn import  pack_padded_sequence, pad_packed_sequence
 
-class Baseline_BiLSTM_CRF:
+class NNCRF(nn.Module):
 
-    def __init__(self, config, model):
-        self.num_layers = 1
-        self.input_dim = config.embedding_dim
-        self.model = model
-        self.use_char_rnn = config.use_char_rnn
+    def __init__(self, config):
+        super(NNCRF, self).__init__()
 
-        self.char_rnn = CharRNN(config, model) if self.use_char_rnn else None
-        input_size = self.input_dim if not self.char_rnn else self.input_dim + config.charlstm_hidden_dim
-        self.bilstm = dy.BiRNNBuilder(1, input_size, config.hidden_dim, self.model,dy.LSTMBuilder)
-        print("Input to word-level BiLSTM size: %d" % (input_size))
-        print("BiLSTM hidden size: %d" % (config.hidden_dim))
-        # self.bilstm.set_dropout(config.dropout_bilstm)
-        self.num_labels = len(config.label2idx)
+        self.label_size = config.label_size
+        self.device = config.device
+        self.use_char = config.use_char_rnn
+
         self.label2idx = config.label2idx
         self.labels = config.idx2labels
-        # print(config.hidden_dim)
+        self.start_idx = self.label2idx[START]
+        self.end_idx = self.label2idx[STOP]
+        self.pad_idx = self.label2idx[PAD]
 
-        # self.tanh_w = self.model.add_parameters((config.tanh_hidden_dim, config.hidden_dim))
-        # self.tanh_bias = self.model.add_parameters((config.tanh_hidden_dim,))
 
-        self.linear_w = self.model.add_parameters((self.num_labels, config.hidden_dim))
-        self.linear_bias = self.model.add_parameters((self.num_labels,))
+        self.input_size = config.embedding_dim
+        if self.use_char:
+            self.char_feature = CharBiLSTM(config)
+            self.input_size += config.charlstm_hidden_dim
 
-        self.transition = self.model.add_lookup_parameters((self.num_labels, self.num_labels))
         vocab_size = len(config.word2idx)
-        self.word2idx = config.word2idx
-        print("Word Embedding size: %d x %d" % (vocab_size, self.input_dim))
-        self.word_embedding = self.model.add_lookup_parameters((vocab_size, self.input_dim), init=config.word_embedding)
-
-        self.dropout = config.dropout
-
-    def save_shared_parameters(self):
-        print("Saving the encoder parameter")
-        # self.word_embedding.save("models/word_embedding.m")
-        dy.save("basename", [self.char_rnn.char_emb, self.char_rnn.fw_lstm, self.char_rnn.bw_lstm,
-                               self.word_embedding, self.bilstm])
-
-    def build_graph_with_char(self, x, all_chars, is_train):
+        # self.word_embedding = nn.Embedding(vocab_size, config.embedding_dim).to(self.device)
+        self.word_embedding = nn.Embedding.from_pretrained(torch.FloatTensor(config.word_embedding), freeze=False).to(self.device)
+        # self.word_embedding.weight.data.copy_(torch.from_numpy(config.word_embedding))
+        self.word_drop = nn.Dropout(config.dropout).to(self.device)
 
 
-        if is_train:
-            embeddings = []
-            for w,chars in zip(x, all_chars):
-                word_emb = self.word_embedding[w]
-                f, b = self.char_rnn.forward_char(chars)
-                concat = dy.concatenate([word_emb, f, b])
-                embeddings.append(dy.dropout(concat, self.dropout))
 
-        else:
-            embeddings = []
-            for w, chars in zip(x, all_chars):
-                word_emb = self.word_embedding[w]
-                f, b = self.char_rnn.forward_char(chars)
-                concat = dy.concatenate([word_emb, f, b])
-                embeddings.append(concat)
-        lstm_out = self.bilstm.transduce(embeddings)
-        # tanh_feats = [dy.tanh(dy.affine_transform([self.tanh_bias, self.tanh_w, rep])) for rep in lstm_out]
-        features = [dy.affine_transform([self.linear_bias, self.linear_w, rep]) for rep in lstm_out]
-        return features
+        self.lstm = nn.LSTM(self.input_size, config.hidden_dim // 2, num_layers=1, batch_first=True, bidirectional=True).to(self.device)
+        self.hidden2tag = nn.Linear(config.hidden_dim, self.label_size).to(self.device)
+        self.drop_lstm = nn.Dropout(config.dropout).to(self.device)
 
-    # computing the negative log-likelihood
-    def build_graph(self, x, is_train):
-        # dy.renew_cg()
-        if is_train:
-            embeddings = [dy.dropout(self.word_embedding[w], self.dropout) for w in x]
-        else:
-            embeddings = [self.word_embedding[w] for w in x]
-        lstm_out = self.bilstm.transduce(embeddings)
-        features = [dy.affine_transform([self.linear_bias, self.linear_w, rep]) for rep in lstm_out]
-        return features
+        self.use_head = config.use_head
+        if self.use_head:
+            self.gcn = GCN(config)
 
-    def forward_unlabeled(self, features):
-        init_alphas = [-1e10] * self.num_labels
-        init_alphas[self.label2idx[START]] = 0
+        init_transition = torch.randn(self.label_size, self.label_size).to(self.device)
+        init_transition[:, self.start_idx] = -10000.0
+        init_transition[self.end_idx, :] = -10000.0
+        init_transition[:, self.pad_idx] = -10000.0
+        init_transition[self.pad_idx, :] = -10000.0
 
-        for_expr = dy.inputVector(init_alphas)
-        for obs in features:
-            alphas_t = []
-            for next_tag in range(self.num_labels):
-                obs_broadcast = dy.concatenate([dy.pick(obs, next_tag)] * self.num_labels)
-                next_tag_expr = for_expr + self.transition[next_tag] + obs_broadcast
-                alphas_t.append(log_sum_exp(next_tag_expr, self.num_labels))
-            for_expr = dy.concatenate(alphas_t)
-        terminal_expr = for_expr + self.transition[self.label2idx[STOP]]
-        alpha = log_sum_exp(terminal_expr, self.num_labels)
-        return alpha
+        self.transition = nn.Parameter(init_transition)
 
-    # Labeled network score
-    def forward_labeled(self, features, tags):
-        score = dy.scalarInput(0)
-        tags = [self.label2idx[w] for w in tags]
-        tags = [self.label2idx[START]] + tags
-        for i, obs in enumerate(features):
-            score = score + dy.pick(self.transition[tags[i + 1]], tags[i]) + dy.pick(obs, tags[i + 1])
-        labeled_score = score + dy.pick(self.transition[self.label2idx[STOP]], tags[-1])
 
-        return labeled_score
+    def neural_scoring(self, word_seq_tensor, word_seq_lens, char_inputs, char_seq_lens, adj_matrixs):
+        """
+        :param word_seq_tensor: (batch_size, sent_len)   NOTE: The word seq actually is already ordered before come here.
+        :param word_seq_lens: (batch_size, 1)
+        :param chars: (batch_size * sent_len * word_length)
+        :param char_seq_lens: numpy (batch_size * sent_len , 1)
+        :return: emission scores (batch_size, sent_len, hidden_dim)
+        """
+        batch_size = word_seq_tensor.size(0)
+        sent_len = word_seq_tensor.size(1)
 
-    def negative_log(self, x, y, x_chars=None):
-        features = self.build_graph(x, True) if not self.use_char_rnn else self.build_graph_with_char(x,x_chars,True)
-        # features = self.build_graph(x, True)
-        unlabed_score = self.forward_unlabeled(features)
-        labeled_score = self.forward_labeled(features, y)
+        word_emb = self.word_embedding(word_seq_tensor)
+        if self.use_char:
+            char_features = self.char_feature.get_last_hiddens(char_inputs, char_seq_lens)
+            word_emb = torch.cat([word_emb, char_features], 2)
+        word_rep = self.word_drop(word_emb)
+
+        sorted_seq_len, permIdx = word_seq_lens.sort(0, descending=True)
+        _, recover_idx = permIdx.sort(0, descending=False)
+        sorted_seq_tensor = word_rep[permIdx]
+
+        packed_words = pack_padded_sequence(sorted_seq_tensor, sorted_seq_len, True)
+        lstm_out, _ = self.lstm(packed_words, None)
+        lstm_out, _ = pad_packed_sequence(lstm_out, batch_first=True)  ## CARE: make sure here is batch_first, otherwise need to transpose.
+        feature_out = self.drop_lstm(lstm_out)
+        ### TODO: dropout this lstm output or not, because ABB code do dropout.
+
+        if self.use_head:
+            feature_out = self.gcn(feature_out)
+
+
+        outputs = self.hidden2tag(feature_out)
+
+        return outputs[recover_idx]
+
+    def calculate_all_scores(self, features):
+        batch_size = features.size(0)
+        seq_len = features.size(1)
+        scores = self.transition.view(1, 1, self.label_size, self.label_size).expand(batch_size, seq_len, self.label_size, self.label_size) + \
+                    features.view(batch_size, seq_len, 1, self.label_size).expand(batch_size,seq_len,self.label_size, self.label_size)
+        return scores
+
+    def forward_unlabeled(self, all_scores, word_seq_lens, masks):
+        batch_size = all_scores.size(0)
+        seq_len = all_scores.size(1)
+        alpha = torch.zeros(batch_size, seq_len, self.label_size).to(self.device)
+
+        alpha[:, 0, :] = all_scores[:, 0,  self.start_idx, :] ## the first position of all labels = (the transition from start - > all labels) + current emission.
+
+        for word_idx in range(1, seq_len):
+            ## batch_size, self.label_size, self.label_size
+            before_log_sum_exp = alpha[:, word_idx-1, :].view(batch_size, self.label_size, 1).expand(batch_size, self.label_size, self.label_size) + all_scores[:, word_idx, :, :]
+            alpha[:, word_idx, :] = log_sum_exp_pytorch(before_log_sum_exp)
+
+        ### batch_size x label_size
+        last_alpha = torch.gather(alpha, 1, word_seq_lens.view(batch_size, 1, 1).expand(batch_size, 1, self.label_size)-1).view(batch_size, self.label_size)
+        last_alpha += self.transition[:, self.end_idx].view(1, self.label_size).expand(batch_size, self.label_size)
+        last_alpha = log_sum_exp_pytorch(last_alpha.view(batch_size, self.label_size, 1)).view(batch_size)
+
+        return torch.sum(last_alpha)
+
+    def forward_labeled(self, all_scores, word_seq_lens, tags, masks):
+        '''
+        :param all_scores: (batch, seq_len, label_size, label_size)
+        :param word_seq_lens: (batch, seq_len)
+        :param tags: (batch, seq_len)
+        :param masks: batch, seq_len
+        :return: sum of score for the gold sequences
+        '''
+        batchSize = all_scores.shape[0]
+        sentLength = all_scores.shape[1]
+
+        ## all the scores to current labels: batch, seq_len, all_from_label?
+        currentTagScores = torch.gather(all_scores, 3, tags.view(batchSize, sentLength, 1, 1).expand(batchSize, sentLength, self.label_size, 1)).view(batchSize, -1, self.label_size)
+        tagTransScoresMiddle = torch.gather(currentTagScores[:, 1:, :], 2, tags[:, : sentLength - 1].view(batchSize, sentLength - 1, 1)).view(batchSize, -1)
+        tagTransScoresBegin = currentTagScores[:, 0, self.start_idx]
+        endTagIds = torch.gather(tags, 1, word_seq_lens.view(batchSize, 1) - 1)
+        tagTransScoresEnd = torch.gather(self.transition[:, self.end_idx].view(1, self.label_size).expand(batchSize, self.label_size), 1,  endTagIds).view(batchSize)
+
+        return torch.sum(tagTransScoresBegin) + torch.sum(tagTransScoresMiddle.masked_select(masks[:, 1:])) + torch.sum(
+            tagTransScoresEnd)
+
+
+    def neg_log_obj(self, words, word_seq_lens, chars, char_seq_lens, adj_matrixs, tags):
+        features = self.neural_scoring(words, word_seq_lens, chars, char_seq_lens)
+
+        all_scores = self.calculate_all_scores(features)
+
+        batch_size = words.size(0)
+        sent_len = words.size(1)
+
+        maskTemp = torch.arange(1, sent_len + 1, dtype=torch.long).view(1, sent_len).expand(batch_size, sent_len).to(self.device)
+        mask = torch.le(maskTemp, word_seq_lens.view(batch_size, 1).expand(batch_size, sent_len)).to(self.device)
+
+        unlabed_score = self.forward_unlabeled(all_scores, word_seq_lens, mask)
+        labeled_score = self.forward_labeled(all_scores, word_seq_lens, tags, mask)
         return unlabed_score - labeled_score
 
-    def viterbi_decoding(self, features):
-        backpointers = []
-        init_vvars = [-1e10] * self.num_labels
-        init_vvars[self.label2idx[START]] = 0  # <Start> has all the probability
-        for_expr = dy.inputVector(init_vvars)
-        trans_exprs = [self.transition[idx] for idx in range(self.num_labels)]
-        for obs in features:
-            bptrs_t = []
-            vvars_t = []
-            for next_tag in range(self.num_labels):
-                next_tag_expr = for_expr + trans_exprs[next_tag]
-                next_tag_arr = next_tag_expr.npvalue()
-                best_tag_id = np.argmax(next_tag_arr)
-                bptrs_t.append(best_tag_id)
-                vvars_t.append(dy.pick(next_tag_expr, best_tag_id))
-            for_expr = dy.concatenate(vvars_t) + obs
 
-            backpointers.append(bptrs_t)
-        # Perform final transition to terminal
-        terminal_expr = for_expr + trans_exprs[self.label2idx[STOP]]
-        terminal_arr = terminal_expr.npvalue()
-        best_tag_id = np.argmax(terminal_arr)
-        path_score = dy.pick(terminal_expr, best_tag_id)
-        # Reverse over the backpointers to get the best path
-        best_path = [best_tag_id]  # Start with the tag that was best for terminal
-        for bptrs_t in reversed(backpointers):
-            best_tag_id = bptrs_t[best_tag_id]
-            best_path.append(best_tag_id)
-        start = best_path.pop()  # Remove the start symbol
-        best_path.reverse()
-        assert start == self.label2idx[START]
-        # Return best path and best path's score
-        return best_path, path_score
+    def viterbiDecode(self, all_scores, word_seq_lens):
+        batchSize = all_scores.shape[0]
+        sentLength = all_scores.shape[1]
+        # sent_len =
+        scoresRecord = torch.zeros([batchSize, sentLength, self.label_size]).to(self.device)
+        idxRecord = torch.zeros([batchSize, sentLength, self.label_size], dtype=torch.int64).to(self.device)
+        mask = torch.ones_like(word_seq_lens, dtype=torch.int64).to(self.device)
+        startIds = torch.full((batchSize, self.label_size), self.start_idx, dtype=torch.int64).to(self.device)
+        decodeIdx = torch.LongTensor(batchSize, sentLength).to(self.device)
 
-    def decode(self, x, x_chars=None):
-        features = self.build_graph(x, False) if not self.use_char_rnn else self.build_graph_with_char(x,x_chars,False)
-        # features = self.build_graph(x, False)
-        best_path, path_score = self.viterbi_decoding(features)
-        best_path = [self.labels[x] for x in best_path]
-        # print(best_path)
-        # print('path_score:', path_score.value())
-        return best_path
+        scores = all_scores
+        # scoresRecord[:, 0, :] = self.getInitAlphaWithBatchSize(batchSize).view(batchSize, self.label_size)
+        scoresRecord[:, 0, :] = scores[:, 0, self.start_idx, :]  ## represent the best current score from the start, is the best
+        idxRecord[:,  0, :] = startIds
+        for wordIdx in range(1, sentLength):
+            ### scoresIdx: batch x from_label x to_label at current index.
+            scoresIdx = scoresRecord[:, wordIdx - 1, :].view(batchSize, self.label_size, 1).expand(batchSize, self.label_size,
+                                                                                  self.label_size) + scores[:, wordIdx, :, :]
+            idxRecord[:, wordIdx, :] = torch.argmax(scoresIdx, 1)  ## the best previous label idx to crrent labels
+            scoresRecord[:, wordIdx, :] = torch.gather(scoresIdx, 1, idxRecord[:, wordIdx, :].view(batchSize, 1, self.label_size)).view(batchSize, self.label_size)
+
+        lastScores = torch.gather(scoresRecord, 1, word_seq_lens.view(batchSize, 1, 1).expand(batchSize, 1, self.label_size) - 1).view(batchSize, self.label_size)  ##select position
+        lastScores += self.transition[:, self.end_idx].view(1, self.label_size).expand(batchSize, self.label_size)
+        decodeIdx[:, 0] = torch.argmax(lastScores, 1)
+        bestScores = torch.gather(lastScores, 1, decodeIdx[:, 0].view(batchSize, 1))
+
+        for distance2Last in range(sentLength - 1):
+            lastNIdxRecord = torch.gather(idxRecord, 1, torch.where(word_seq_lens - distance2Last - 1 > 0, word_seq_lens - distance2Last - 1, mask).view(batchSize, 1, 1).expand(batchSize, 1, self.label_size)).view(batchSize, self.label_size)
+            decodeIdx[:, distance2Last + 1] = torch.gather(lastNIdxRecord, 1, decodeIdx[:, distance2Last].view(batchSize, 1)).view(batchSize)
+
+        return bestScores, decodeIdx
+
+    def decode(self, batchInput):
+        wordSeqTensor, wordSeqLengths, charSeqTensor, charSeqLengths, tagSeqTensor = batchInput
+        features = self.neural_scoring(wordSeqTensor, wordSeqLengths,charSeqTensor,charSeqLengths)
+        all_scores = self.calculate_all_scores(features)
+        bestScores, decodeIdx = self.viterbiDecode(all_scores, wordSeqLengths)
+        return bestScores, decodeIdx
