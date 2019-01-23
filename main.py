@@ -29,14 +29,14 @@ def setSeed(opt, seed):
 def parse_arguments(parser):
     ###Training Hyperparameters
     parser.add_argument('--mode', type=str, default='train')
-    parser.add_argument('--device', type=str, default="cuda:0")
+    parser.add_argument('--device', type=str, default="cpu")
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--digit2zero', action="store_true", default=True)
     parser.add_argument('--dataset', type=str, default="abc")
     parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
     # parser.add_argument('--embedding_file', type=str, default=None)
     parser.add_argument('--embedding_dim', type=int, default=100)
-    parser.add_argument('--optimizer', type=str, default="adam")
+    parser.add_argument('--optimizer', type=str, default="sgd")
     parser.add_argument('--learning_rate', type=float, default=0.015) ##only for sgd now
     parser.add_argument('--momentum', type=float, default=0.0)
     parser.add_argument('--l2', type=float, default=1e-8)
@@ -52,6 +52,8 @@ def parse_arguments(parser):
     ##model hyperparameter
     parser.add_argument('--hidden_dim', type=int, default=200, help="hidden size of the LSTM")
     parser.add_argument('--dep_emb_size', type=int, default=50, help="embedding size of dependency")
+
+    ##NOTE: this dropout applies to many places
     parser.add_argument('--dropout', type=float, default=0.5, help="dropout for embedding")
     parser.add_argument('--use_char_rnn', type=int, default=1, choices=[0, 1], help="use character-level lstm, 0 or 1")
     parser.add_argument('--use_head', type=int, default=0, choices=[0, 1], help="not use dependency")
@@ -105,8 +107,8 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
     best_dev = [-1, 0]
     best_test = [-1, 0]
 
-    model_name = "model_files/lstm_{}_{}_crf_{}_{}_head_{}_elmo_{}.m".format(config.hidden_dim, config.second_hidden_size, config.dataset, config.train_num, config.use_head, config.use_elmo)
-    res_name = "results/lstm_{}_{}_crf_{}_{}_head_{}_elmo_{}.results".format(config.hidden_dim, config.second_hidden_size, config.dataset, config.train_num, config.use_head, config.use_elmo)
+    model_name = "model_files/lstm_{}_crf_{}_{}_head_{}_elmo_{}.m".format(config.hidden_dim, config.dataset, config.train_num, config.use_head, config.use_elmo)
+    res_name = "results/lstm_{}_crf_{}_{}_head_{}_elmo_{}.results".format(config.hidden_dim, config.dataset, config.train_num, config.use_head, config.use_elmo)
     print("[Info] The model will be saved to: %s, please ensure models folder exist" % (model_name))
 
     for i in range(1, epoch + 1):
@@ -119,7 +121,7 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
         # for index in range(len(batched_data)):
             model.train()
             batch_word, batch_wordlen, batch_char, batch_charlen, adj_matrixs, batch_label = batched_data[index]
-            loss = model.neg_log_obj(batch_word, batch_wordlen,batch_char, batch_charlen, batch_label)
+            loss = model.neg_log_obj(batch_word, batch_wordlen,batch_char, batch_charlen, adj_matrixs, batch_label)
             epoch_loss += loss.item()
             loss.backward()
             # # torch.nn.utils.clip_grad_norm_(model.parameters(), config.clip) ##clipping the gradient
@@ -166,8 +168,8 @@ def evaluate(config:Config, model: NNCRF, batch_insts_ids, name:str):
 
 
 def test(config: Config, test_insts):
-    model_name = "model_files/lstm_{}_{}_crf_{}_{}_head_{}_elmo_{}.m".format(config.hidden_dim, config.second_hidden_size, config.dataset, config.train_num, config.use_head, config.use_elmo)
-    res_name = "results/lstm_{}_{}_crf_{}_{}_head_{}_elmo_{}.results".format(config.hidden_dim, config.second_hidden_size, config.dataset, config.train_num, config.use_head, config.use_elmo)
+    model_name = "model_files/lstm_{}_crf_{}_{}_head_{}_elmo_{}.m".format(config.hidden_dim, config.dataset, config.train_num, config.use_head, config.use_elmo)
+    res_name = "results/lstm_{}_crf_{}_{}_head_{}_elmo_{}.results".format(config.hidden_dim, config.dataset, config.train_num, config.use_head, config.use_elmo)
     model = NNCRF(config)
     model.load_state_dict(torch.load(model_name))
     model.eval()
@@ -202,12 +204,12 @@ def main():
     reader = Reader(conf.digit2zero)
     setSeed(opt, conf.seed)
 
-    # trains = reader.read_conll(conf.train_file, conf.train_num, True)
-    # devs = reader.read_conll(conf.dev_file, conf.dev_num, False)
-    # tests = reader.read_conll(conf.test_file, conf.test_num, False)
-    trains = reader.read_txt(conf.train_file, conf.train_num, True)
-    devs = reader.read_txt(conf.dev_file, conf.dev_num, False)
-    tests = reader.read_txt(conf.test_file, conf.test_num, False)
+    trains = reader.read_conll(conf.train_file, conf.train_num, True)
+    devs = reader.read_conll(conf.dev_file, conf.dev_num, False)
+    tests = reader.read_conll(conf.test_file, conf.test_num, False)
+    # trains = reader.read_txt(conf.train_file, conf.train_num, True)
+    # devs = reader.read_txt(conf.dev_file, conf.dev_num, False)
+    # tests = reader.read_txt(conf.test_file, conf.test_num, False)
     # print(trains[-1].input.words)
 
     if conf.use_elmo:
@@ -221,11 +223,11 @@ def main():
     conf.use_iobes(tests)
     conf.build_label_idx(trains)
 
-    # conf.build_deplabel_idx(trains)
-    # conf.build_deplabel_idx(devs)
-    # conf.build_deplabel_idx(tests)
-    # print("# deplabels: ", conf.deplabels)
-    # print("dep label 2idx: ", conf.deplabel2idx)
+    conf.build_deplabel_idx(trains)
+    conf.build_deplabel_idx(devs)
+    conf.build_deplabel_idx(tests)
+    print("# deplabels: ", conf.deplabels)
+    print("dep label 2idx: ", conf.deplabel2idx)
 
     conf.build_word_idx(trains, tests, devs)
     conf.build_emb_table()
@@ -245,7 +247,7 @@ def main():
         learn_from_insts(conf, conf.num_epochs, trains, devs, tests)
     else:
         ## Load the trained model.
-        test(conf, ids_test, conf.batch_size)
+        test(conf, tests)
         # pass
 
     print(opt.mode)

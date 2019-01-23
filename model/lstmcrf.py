@@ -84,7 +84,7 @@ class NNCRF(nn.Module):
         ### TODO: dropout this lstm output or not, because ABB code do dropout.
 
         if self.use_head:
-            feature_out = self.gcn(feature_out)
+            feature_out = self.gcn(feature_out, word_seq_lens, adj_matrixs)
 
 
         outputs = self.hidden2tag(feature_out)
@@ -140,7 +140,7 @@ class NNCRF(nn.Module):
 
 
     def neg_log_obj(self, words, word_seq_lens, chars, char_seq_lens, adj_matrixs, tags):
-        features = self.neural_scoring(words, word_seq_lens, chars, char_seq_lens)
+        features = self.neural_scoring(words, word_seq_lens, chars, char_seq_lens, adj_matrixs)
 
         all_scores = self.calculate_all_scores(features)
 
@@ -188,8 +188,8 @@ class NNCRF(nn.Module):
         return bestScores, decodeIdx
 
     def decode(self, batchInput):
-        wordSeqTensor, wordSeqLengths, charSeqTensor, charSeqLengths, tagSeqTensor = batchInput
-        features = self.neural_scoring(wordSeqTensor, wordSeqLengths,charSeqTensor,charSeqLengths)
+        wordSeqTensor, wordSeqLengths, charSeqTensor, charSeqLengths, adj_matrixs, tagSeqTensor = batchInput
+        features = self.neural_scoring(wordSeqTensor, wordSeqLengths,charSeqTensor,charSeqLengths, adj_matrixs)
         all_scores = self.calculate_all_scores(features)
         bestScores, decodeIdx = self.viterbiDecode(all_scores, wordSeqLengths)
         return bestScores, decodeIdx
