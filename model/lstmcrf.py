@@ -45,6 +45,7 @@ class NNCRF(nn.Module):
 
         self.use_head = config.use_head
         if self.use_head:
+            self.dep_label_embedding = nn.Embedding(len(config.deplabel2idx), config.dep_emb_size)
             self.gcn = GCN(config)
 
         init_transition = torch.randn(self.label_size, self.label_size).to(self.device)
@@ -56,12 +57,13 @@ class NNCRF(nn.Module):
         self.transition = nn.Parameter(init_transition)
 
 
-    def neural_scoring(self, word_seq_tensor, word_seq_lens, char_inputs, char_seq_lens, adj_matrixs):
+    def neural_scoring(self, word_seq_tensor, word_seq_lens, char_inputs, char_seq_lens, adj_matrixs, dep_label_tensor):
         """
         :param word_seq_tensor: (batch_size, sent_len)   NOTE: The word seq actually is already ordered before come here.
         :param word_seq_lens: (batch_size, 1)
         :param chars: (batch_size * sent_len * word_length)
         :param char_seq_lens: numpy (batch_size * sent_len , 1)
+        :param dep_label_tensor: (batch_size, max_sent_len)
         :return: emission scores (batch_size, sent_len, hidden_dim)
         """
         batch_size = word_seq_tensor.size(0)
@@ -84,7 +86,9 @@ class NNCRF(nn.Module):
         ### TODO: dropout this lstm output or not, because ABB code do dropout.
 
         if self.use_head:
-            feature_out = self.gcn(feature_out, sorted_seq_len, adj_matrixs[permIdx])
+            dep_emb = self.dep_label_embedding(dep_label_tensor)[permIdx]
+            gcn_input = torch.cat([feature_out, dep_emb], 2)
+            feature_out = self.gcn(gcn_input, sorted_seq_len, adj_matrixs[permIdx])
 
 
         outputs = self.hidden2tag(feature_out)
@@ -139,8 +143,8 @@ class NNCRF(nn.Module):
             tagTransScoresEnd)
 
 
-    def neg_log_obj(self, words, word_seq_lens, chars, char_seq_lens, adj_matrixs, tags):
-        features = self.neural_scoring(words, word_seq_lens, chars, char_seq_lens, adj_matrixs)
+    def neg_log_obj(self, words, word_seq_lens, chars, char_seq_lens, adj_matrixs, tags, batch_dep_label):
+        features = self.neural_scoring(words, word_seq_lens, chars, char_seq_lens, adj_matrixs, batch_dep_label)
 
         all_scores = self.calculate_all_scores(features)
 
@@ -188,8 +192,8 @@ class NNCRF(nn.Module):
         return bestScores, decodeIdx
 
     def decode(self, batchInput):
-        wordSeqTensor, wordSeqLengths, charSeqTensor, charSeqLengths, adj_matrixs, tagSeqTensor = batchInput
-        features = self.neural_scoring(wordSeqTensor, wordSeqLengths,charSeqTensor,charSeqLengths, adj_matrixs)
+        wordSeqTensor, wordSeqLengths, charSeqTensor, charSeqLengths, adj_matrixs, tagSeqTensor, batch_dep_label = batchInput
+        features = self.neural_scoring(wordSeqTensor, wordSeqLengths,charSeqTensor,charSeqLengths, adj_matrixs, batch_dep_label)
         all_scores = self.calculate_all_scores(features)
         bestScores, decodeIdx = self.viterbiDecode(all_scores, wordSeqLengths)
         return bestScores, decodeIdx

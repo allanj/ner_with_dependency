@@ -32,11 +32,11 @@ def parse_arguments(parser):
     parser.add_argument('--device', type=str, default="cpu")
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--digit2zero', action="store_true", default=True)
-    parser.add_argument('--dataset', type=str, default="abc")
-    parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
-    # parser.add_argument('--embedding_file', type=str, default=None)
+    parser.add_argument('--dataset', type=str, default="cnn")
+    # parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
+    parser.add_argument('--embedding_file', type=str, default=None)
     parser.add_argument('--embedding_dim', type=int, default=100)
-    parser.add_argument('--optimizer', type=str, default="sgd")
+    parser.add_argument('--optimizer', type=str, default="adam")
     parser.add_argument('--learning_rate', type=float, default=0.015) ##only for sgd now
     parser.add_argument('--momentum', type=float, default=0.0)
     parser.add_argument('--l2', type=float, default=1e-8)
@@ -60,7 +60,7 @@ def parse_arguments(parser):
     ##NOTE: this dropout applies to many places
     parser.add_argument('--dropout', type=float, default=0.5, help="dropout for embedding")
     parser.add_argument('--use_char_rnn', type=int, default=1, choices=[0, 1], help="use character-level lstm, 0 or 1")
-    parser.add_argument('--use_head', type=int, default=0, choices=[0, 1], help="not use dependency")
+    parser.add_argument('--use_head', type=int, default=1, choices=[0, 1], help="not use dependency")
     parser.add_argument('--use_elmo', type=int, default=0, choices=[0, 1], help="use Elmo embedding or not")
 
 
@@ -124,8 +124,8 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
         for index in np.random.permutation(len(batched_data)):
         # for index in range(len(batched_data)):
             model.train()
-            batch_word, batch_wordlen, batch_char, batch_charlen, adj_matrixs, batch_label = batched_data[index]
-            loss = model.neg_log_obj(batch_word, batch_wordlen,batch_char, batch_charlen, adj_matrixs, batch_label)
+            batch_word, batch_wordlen, batch_char, batch_charlen, adj_matrixs, batch_label, batch_dep_label = batched_data[index]
+            loss = model.neg_log_obj(batch_word, batch_wordlen,batch_char, batch_charlen, adj_matrixs, batch_label, batch_dep_label)
             epoch_loss += loss.item()
             loss.backward()
             # # torch.nn.utils.clip_grad_norm_(model.parameters(), config.clip) ##clipping the gradient
@@ -162,7 +162,7 @@ def evaluate(config:Config, model: NNCRF, batch_insts_ids, name:str):
     metrics = np.asarray([0, 0, 0], dtype=int)
     for batch in batch_insts_ids:
         batch_max_scores, batch_max_ids = model.decode(batch)
-        metrics += eval.evaluate_num(batch_max_ids, batch[-1], batch[1], config.idx2labels)
+        metrics += eval.evaluate_num(batch_max_ids, batch[-2], batch[1], config.idx2labels)
     p, total_predict, total_entity = metrics[0], metrics[1], metrics[2]
     precision = p * 1.0 / total_predict * 100 if total_predict != 0 else 0
     recall = p * 1.0 / total_entity * 100 if total_entity != 0 else 0
