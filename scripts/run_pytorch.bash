@@ -19,6 +19,9 @@ batch=10
 num_epochs=50
 eval_freq=40
 device=cuda:0
+gcn_layer=1
+gcn_dropout=0
+gcn_mlp_layers=1
 
 for (( d=0; d<${#datasets[@]}; d++  )) do
     dataset=${datasets[$d]}
@@ -26,7 +29,8 @@ for (( d=0; d<${#datasets[@]}; d++  )) do
         head=${heads[$h]}
         python3.6 main.py --use_head ${head} --use_elmo ${elmo} --hidden_dim ${hidden} --optimizer ${optim}\
           --dataset ${dataset}  --eval_freq ${eval_freq} --num_epochs ${num_epochs} --device ${device} \
-          --batch_size ${batch} > logs/hidden_${hidden}_${dataset}_head_${head}_asfeat_elmo_${elmo}.log 2>&1
+          --batch_size ${batch} --num_gcn_layers ${gcn_layer} --gcn_mlp_layers ${gcn_mlp_layers} \
+          --gcn_dropout ${gcn_dropout} > logs/hidden_${hidden}_${dataset}_head_${head}_asfeat_elmo_${elmo}.log 2>&1
     done
 done
 

@@ -84,7 +84,7 @@ class NNCRF(nn.Module):
         ### TODO: dropout this lstm output or not, because ABB code do dropout.
 
         if self.use_head:
-            feature_out = self.gcn(feature_out, word_seq_lens, adj_matrixs)
+            feature_out = self.gcn(feature_out, sorted_seq_len, adj_matrixs[permIdx])
 
 
         outputs = self.hidden2tag(feature_out)
