@@ -52,6 +52,10 @@ def parse_arguments(parser):
     ##model hyperparameter
     parser.add_argument('--hidden_dim', type=int, default=200, help="hidden size of the LSTM")
     parser.add_argument('--dep_emb_size', type=int, default=50, help="embedding size of dependency")
+    parser.add_argument('--gcn_hidden_dim', type=int, default=200, help="gcn hidden size")
+    parser.add_argument('--num_gcn_layers', type=int, default=2, help="number of gcn layers")
+    parser.add_argument('--gcn_mlp_layers', type=int, default=1, help="number of mlp layers after gcn")
+    parser.add_argument('--gcn_dropout', type=float,default=0.5, help="GCN dropout")
 
     ##NOTE: this dropout applies to many places
     parser.add_argument('--dropout', type=float, default=0.5, help="dropout for embedding")

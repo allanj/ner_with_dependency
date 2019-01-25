@@ -14,15 +14,13 @@ class GCN(nn.Module):
         self.gcn_hidden_dim = config.gcn_hidden_dim
         self.num_gcn_layers = config.num_gcn_layers
         self.gcn_mlp_layers = config.gcn_mlp_layers
-        self.label_size = config.label_size
         # gcn layer
         self.layers = self.num_gcn_layers
         self.device = config.device
         self.mem_dim = self.gcn_hidden_dim
-        self.in_dim = config.lstm_hidden_dim
+        self.in_dim = config.hidden_dim ## lstm hidden dim
 
-        self.in_drop = nn.Dropout(config.gcn_input_dropout).to(self.device)
-        self.gcn_drop = nn.Dropout(config.gcn_output_dropout).to(self.device)
+        self.gcn_drop = nn.Dropout(config.gcn_dropout).to(self.device)
 
         # gcn layer
         self.W = nn.ModuleList()
@@ -32,18 +30,18 @@ class GCN(nn.Module):
             self.W.append(nn.Linear(input_dim, self.mem_dim).to(self.device))
 
         # output mlp layers
-        in_dim = config.lstm_hidden_dim
-        layers = [nn.Linear(in_dim, self.gcn_hidden_dim), nn.ReLU()]
+        in_dim = config.hidden_dim
+        layers = [nn.Linear(in_dim, self.gcn_hidden_dim).to(self.device), nn.ReLU().to(self.device)]
         for _ in range(self.gcn_mlp_layers - 1):
-            layers += [nn.Linear(self.gcn_hidden_dim, self.gcn_hidden_dim), nn.ReLU()]
+            layers += [nn.Linear(self.gcn_hidden_dim, self.gcn_hidden_dim).to(self.device), nn.ReLU().to(self.device)]
 
         self.out_mlp = nn.Sequential(*layers).to(self.device)
 
 
 
-    def forward(self, lstm_hidden_rep, word_seq_len, adj_matrix):
+    def forward(self, gcn_inputs, word_seq_len, adj_matrix):
 
-        gcn_inputs = self.in_drop(lstm_hidden_rep)
+        # print(adj_matrix.size())
 
         denom = adj_matrix.sum(2).unsqueeze(2) + 1
 

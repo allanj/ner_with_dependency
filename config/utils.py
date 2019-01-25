@@ -49,7 +49,7 @@ def simple_batching(config, insts: List[Instance]):
     adjs = None
     if config.use_head:
         adjs = [ head_to_adj(max_seq_len, inst) for inst in batch_data]
-        adjs = np.concatenate(adjs, axis=0)
+        adjs = np.stack(adjs, axis=0)
         adjs = torch.from_numpy(adjs)
     for idx in range(batch_size):
         word_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].word_ids)

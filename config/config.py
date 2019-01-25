@@ -79,6 +79,11 @@ class Config:
         self.use_char_rnn = args.use_char_rnn
         self.use_head = args.use_head
 
+        self.gcn_hidden_dim = args.gcn_hidden_dim
+        self.num_gcn_layers = args.num_gcn_layers
+        self.gcn_mlp_layers = args.gcn_mlp_layers
+        self.gcn_dropout = args.gcn_dropout
+
         self.dep_emb_size = args.dep_emb_size
         self.deplabel2idx = {}
         self.deplabels = []
