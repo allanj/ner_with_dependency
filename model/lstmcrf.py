@@ -45,7 +45,7 @@ class NNCRF(nn.Module):
 
         self.use_head = config.use_head
         if self.use_head:
-            self.dep_label_embedding = nn.Embedding(len(config.deplabel2idx), config.dep_emb_size)
+            self.dep_label_embedding = nn.Embedding(len(config.deplabel2idx), config.dep_emb_size).to(self.device)
             self.gcn = GCN(config)
 
         init_transition = torch.randn(self.label_size, self.label_size).to(self.device)
