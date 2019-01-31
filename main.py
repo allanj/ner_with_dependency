@@ -29,19 +29,20 @@ def setSeed(opt, seed):
 def parse_arguments(parser):
     ###Training Hyperparameters
     parser.add_argument('--mode', type=str, default='train')
-    parser.add_argument('--device', type=str, default="cpu")
+    parser.add_argument('--device', type=str, default="cuda:0")
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--digit2zero', action="store_true", default=True)
-    parser.add_argument('--dataset', type=str, default="cnn")
-    # parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
-    parser.add_argument('--embedding_file', type=str, default=None)
+    parser.add_argument('--dataset', type=str, default="conll2003")
+    parser.add_argument('--affix', type=str, default="ud")
+    parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
+    # parser.add_argument('--embedding_file', type=str, default=None)
     parser.add_argument('--embedding_dim', type=int, default=100)
     parser.add_argument('--optimizer', type=str, default="adam")
     parser.add_argument('--learning_rate', type=float, default=0.015) ##only for sgd now
     parser.add_argument('--momentum', type=float, default=0.0)
     parser.add_argument('--l2', type=float, default=1e-8)
     parser.add_argument('--lr_decay', type=float, default=0.05)
-    parser.add_argument('--batch_size', type=int, default=2)
+    parser.add_argument('--batch_size', type=int, default=10)
     parser.add_argument('--num_epochs', type=int, default=100)
     parser.add_argument('--train_num', type=int, default=-1)
     parser.add_argument('--dev_num', type=int, default=-1)
@@ -60,7 +61,7 @@ def parse_arguments(parser):
     ##NOTE: this dropout applies to many places
     parser.add_argument('--dropout', type=float, default=0.5, help="dropout for embedding")
     parser.add_argument('--use_char_rnn', type=int, default=1, choices=[0, 1], help="use character-level lstm, 0 or 1")
-    parser.add_argument('--use_head', type=int, default=1, choices=[0, 1], help="not use dependency")
+    parser.add_argument('--use_head', type=int, default=0, choices=[0, 1], help="not use dependency")
     parser.add_argument('--use_elmo', type=int, default=0, choices=[0, 1], help="use Elmo embedding or not")
 
 

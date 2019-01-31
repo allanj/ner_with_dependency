@@ -40,12 +40,16 @@ class Config:
         #     self.dev_file = "data/" + self.dataset + "/test.conllx"
         # self.test_file = "data/" + self.dataset + "/test.txt"
 
-        self.train_file = "data/" + self.dataset + "/train.conllx"
-        self.dev_file = "data/" + self.dataset + "/dev.conllx"
+        self.affix = ""
+        if self.dataset == "conll2003":
+            self.affix = "." + args.affix
+
+        self.train_file = "data/" + self.dataset + "/train"+self.affix+".conllx"
+        self.dev_file = "data/" + self.dataset + "/dev"+self.affix+".conllx"
         ## following datasets do not have development set
         if self.dataset in ("abc", "cnn", "mnb", "nbc", "p25", "pri", "voa"):
             self.dev_file = "data/" + self.dataset + "/test.conllx"
-        self.test_file = "data/" + self.dataset + "/test.conllx"
+        self.test_file = "data/" + self.dataset + "/test"+self.affix+".conllx"
         self.label2idx = {}
         self.idx2labels = []
         self.char2idx = {}
