@@ -29,11 +29,11 @@ def setSeed(opt, seed):
 def parse_arguments(parser):
     ###Training Hyperparameters
     parser.add_argument('--mode', type=str, default='train')
-    parser.add_argument('--device', type=str, default="cuda:0")
+    parser.add_argument('--device', type=str, default="cpu")
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--digit2zero', action="store_true", default=True)
-    parser.add_argument('--dataset', type=str, default="conll2003")
-    parser.add_argument('--affix', type=str, default="ud")
+    parser.add_argument('--dataset', type=str, default="all")
+    parser.add_argument('--affix', type=str, default="sd")
     parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
     # parser.add_argument('--embedding_file', type=str, default=None)
     parser.add_argument('--embedding_dim', type=int, default=100)

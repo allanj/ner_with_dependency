@@ -40,9 +40,9 @@ class Config:
         #     self.dev_file = "data/" + self.dataset + "/test.conllx"
         # self.test_file = "data/" + self.dataset + "/test.txt"
 
-        self.affix = ""
-        if self.dataset == "conll2003":
-            self.affix = "." + args.affix
+        self.affix = "." + args.affix
+        if self.dataset == "all":
+            self.affix = ""
 
         self.train_file = "data/" + self.dataset + "/train"+self.affix+".conllx"
         self.dev_file = "data/" + self.dataset + "/dev"+self.affix+".conllx"
