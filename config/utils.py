@@ -7,6 +7,7 @@ from common.instance import Instance
 START = "<START>"
 STOP = "<STOP>"
 PAD = "<PAD>"
+ROOT = "<ROOT>"
 
 
 def log_sum_exp_pytorch(vec):
@@ -48,15 +49,18 @@ def simple_batching(config, insts: List[Instance]):
     char_seq_tensor = torch.zeros((batch_size, max_seq_len, max_char_seq_len), dtype=torch.long)
     adjs = None
     dep_label_tensor = None
+    batch_dep_heads = None
     if config.use_head:
         adjs = [ head_to_adj(max_seq_len, inst) for inst in batch_data]
         adjs = np.stack(adjs, axis=0)
         adjs = torch.from_numpy(adjs)
+        batch_dep_heads = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
         dep_label_tensor = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
     for idx in range(batch_size):
         word_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].word_ids)
         label_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].output_ids)
         if config.use_head:
+            dep_label_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].dep_head_ids)
             dep_label_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].dep_label_ids)
         for word_idx in range(word_seq_len[idx]):
             char_seq_tensor[idx, word_idx, :char_seq_len[idx, word_idx]] = torch.LongTensor(batch_data[idx].char_ids[word_idx])
@@ -72,7 +76,7 @@ def simple_batching(config, insts: List[Instance]):
         adjs = adjs.to(config.device)
         dep_label_tensor = dep_label_tensor.to(config.device)
 
-    return word_seq_tensor, word_seq_len, char_seq_tensor, char_seq_len, adjs, label_seq_tensor, dep_label_tensor
+    return word_seq_tensor, word_seq_len, char_seq_tensor, char_seq_len, adjs, batch_dep_heads, label_seq_tensor, dep_label_tensor
 
 
 

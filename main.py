@@ -62,6 +62,7 @@ def parse_arguments(parser):
     parser.add_argument('--dropout', type=float, default=0.5, help="dropout for embedding")
     parser.add_argument('--use_char_rnn', type=int, default=1, choices=[0, 1], help="use character-level lstm, 0 or 1")
     parser.add_argument('--use_head', type=int, default=0, choices=[0, 1], help="not use dependency")
+    parser.add_argument('--dep_method',type=str, default="none", help="dependency method")
     parser.add_argument('--use_elmo', type=int, default=0, choices=[0, 1], help="use Elmo embedding or not")
 
 
@@ -125,8 +126,8 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
         for index in np.random.permutation(len(batched_data)):
         # for index in range(len(batched_data)):
             model.train()
-            batch_word, batch_wordlen, batch_char, batch_charlen, adj_matrixs, batch_label, batch_dep_label = batched_data[index]
-            loss = model.neg_log_obj(batch_word, batch_wordlen,batch_char, batch_charlen, adj_matrixs, batch_label, batch_dep_label)
+            batch_word, batch_wordlen, batch_char, batch_charlen, adj_matrixs, batch_dep_heads, batch_label, batch_dep_label = batched_data[index]
+            loss = model.neg_log_obj(batch_word, batch_wordlen,batch_char, batch_charlen, adj_matrixs, batch_dep_heads, batch_label, batch_dep_label)
             epoch_loss += loss.item()
             loss.backward()
             # # torch.nn.utils.clip_grad_norm_(model.parameters(), config.clip) ##clipping the gradient

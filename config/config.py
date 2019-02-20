@@ -6,8 +6,18 @@ import numpy as np
 from tqdm import tqdm
 from typing import List
 from common.instance import Instance
-from config.utils import PAD, START, STOP
+from config.utils import PAD, START, STOP, ROOT
 import torch
+from enum import Enum
+
+class DepMethod(Enum):
+    none = 0
+    feat_emb = 1
+    tree_lstm = 2
+    gcn = 3
+    selfattn = 4
+
+
 
 class Config:
     def __init__(self, args):
@@ -20,6 +30,7 @@ class Config:
         self.O = "O"
         self.START_TAG = START
         self.STOP_TAG = STOP
+        self.ROOT = ROOT
         self.UNK = "<UNK>"
         self.unk_id = -1
 
@@ -82,6 +93,7 @@ class Config:
         self.charlstm_hidden_dim = 50
         self.use_char_rnn = args.use_char_rnn
         self.use_head = args.use_head
+        self.dep_method = DepMethod[args.dep_method]
 
         self.gcn_hidden_dim = args.gcn_hidden_dim
         self.num_gcn_layers = args.num_gcn_layers
@@ -140,6 +152,9 @@ class Config:
         self.word2idx[self.UNK] = 1
         self.unk_id = 1
         self.idx2word.append(self.UNK)
+
+        self.word2idx[self.ROOT] = 2
+        self.idx2word.append(self.ROOT)
 
         self.char2idx[self.PAD] = 0
         self.idx2char.append(self.PAD)
@@ -242,6 +257,7 @@ class Config:
             inst.word_ids = []
             inst.char_ids = []
             inst.dep_label_ids = []
+            inst.dep_head_ids = []
             inst.output_ids = []
             for word in words:
                 if word in self.word2idx:
@@ -255,6 +271,16 @@ class Config:
                     else:
                         char_id.append(self.char2idx[self.UNK])
                 inst.char_ids.append(char_id)
+            for head in inst.input.heads:
+                if head == -1:
+                    inst.dep_head_ids.append(self.word2idx[self.ROOT])
+                else:
+                    word = inst.input.words[head]
+                    if word in self.word2idx:
+                        inst.dep_head_ids.append(self.word2idx[word])
+                    else:
+                        inst.dep_head_ids.append(self.word2idx[self.UNK])
+
             for label in inst.input.dep_labels:
                 inst.dep_label_ids.append(self.deplabel2idx[label])
             for label in inst.output:

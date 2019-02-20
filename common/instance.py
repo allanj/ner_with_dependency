@@ -11,6 +11,7 @@ class Instance:
         self.word_ids = None
         self.char_ids = None
         self.dep_label_ids = None
+        self.dep_head_ids = None
         self.output_ids = None
 
     def __len__(self):

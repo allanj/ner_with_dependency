@@ -9,6 +9,7 @@ from config.utils import START, STOP, PAD, log_sum_exp_pytorch
 from model.charbilstm import CharBiLSTM
 from model.gcn import GCN
 from torch.nn.utils.rnn import  pack_padded_sequence, pad_packed_sequence
+from config.config import DepMethod
 
 class NNCRF(nn.Module):
 
@@ -18,6 +19,8 @@ class NNCRF(nn.Module):
         self.label_size = config.label_size
         self.device = config.device
         self.use_char = config.use_char_rnn
+        self.dep_method = config.dep_method
+        self.use_head = config.use_head
 
         self.label2idx = config.label2idx
         self.labels = config.idx2labels
@@ -31,22 +34,27 @@ class NNCRF(nn.Module):
             self.char_feature = CharBiLSTM(config)
             self.input_size += config.charlstm_hidden_dim
 
+
+
         vocab_size = len(config.word2idx)
         # self.word_embedding = nn.Embedding(vocab_size, config.embedding_dim).to(self.device)
         self.word_embedding = nn.Embedding.from_pretrained(torch.FloatTensor(config.word_embedding), freeze=False).to(self.device)
         # self.word_embedding.weight.data.copy_(torch.from_numpy(config.word_embedding))
         self.word_drop = nn.Dropout(config.dropout).to(self.device)
 
+        if self.use_head and self.dep_method == DepMethod.feat_emb:
+            self.input_size += config.embedding_dim + config.dep_emb_size
 
 
         self.lstm = nn.LSTM(self.input_size, config.hidden_dim // 2, num_layers=1, batch_first=True, bidirectional=True).to(self.device)
         self.hidden2tag = nn.Linear(config.hidden_dim, self.label_size).to(self.device)
         self.drop_lstm = nn.Dropout(config.dropout).to(self.device)
 
-        self.use_head = config.use_head
+
         if self.use_head:
             self.dep_label_embedding = nn.Embedding(len(config.deplabel2idx), config.dep_emb_size).to(self.device)
-            self.gcn = GCN(config)
+            if self.dep_method == DepMethod.gcn:
+                self.gcn = GCN(config)
 
         init_transition = torch.randn(self.label_size, self.label_size).to(self.device)
         init_transition[:, self.start_idx] = -10000.0
@@ -57,7 +65,7 @@ class NNCRF(nn.Module):
         self.transition = nn.Parameter(init_transition)
 
 
-    def neural_scoring(self, word_seq_tensor, word_seq_lens, char_inputs, char_seq_lens, adj_matrixs, dep_label_tensor):
+    def neural_scoring(self, word_seq_tensor, word_seq_lens, char_inputs, char_seq_lens, adj_matrixs, dep_head_tensor, dep_label_tensor):
         """
         :param word_seq_tensor: (batch_size, sent_len)   NOTE: The word seq actually is already ordered before come here.
         :param word_seq_lens: (batch_size, 1)
@@ -73,6 +81,11 @@ class NNCRF(nn.Module):
         if self.use_char:
             char_features = self.char_feature.get_last_hiddens(char_inputs, char_seq_lens)
             word_emb = torch.cat([word_emb, char_features], 2)
+        if self.use_head:
+            if self.dep_method == DepMethod.feat_emb:
+                dep_head_emb = self.word_embedding(dep_head_tensor)
+                dep_emb = self.dep_label_embedding(dep_label_tensor)
+                word_emb = torch.cat([word_emb, dep_head_emb, dep_emb], 2)
         word_rep = self.word_drop(word_emb)
 
         sorted_seq_len, permIdx = word_seq_lens.sort(0, descending=True)
@@ -86,9 +99,11 @@ class NNCRF(nn.Module):
         ### TODO: dropout this lstm output or not, because ABB code do dropout.
 
         if self.use_head:
-            dep_emb = self.dep_label_embedding(dep_label_tensor)[permIdx]
-            gcn_input = torch.cat([feature_out, dep_emb], 2)
-            feature_out = self.gcn(gcn_input, sorted_seq_len, adj_matrixs[permIdx])
+
+            if self.dep_method == DepMethod.gcn:
+                dep_emb = self.dep_label_embedding(dep_label_tensor)[permIdx]
+                gcn_input = torch.cat([feature_out, dep_emb], 2)
+                feature_out = self.gcn(gcn_input, sorted_seq_len, adj_matrixs[permIdx])
 
 
         outputs = self.hidden2tag(feature_out)
@@ -143,8 +158,8 @@ class NNCRF(nn.Module):
             tagTransScoresEnd)
 
 
-    def neg_log_obj(self, words, word_seq_lens, chars, char_seq_lens, adj_matrixs, tags, batch_dep_label):
-        features = self.neural_scoring(words, word_seq_lens, chars, char_seq_lens, adj_matrixs, batch_dep_label)
+    def neg_log_obj(self, words, word_seq_lens, chars, char_seq_lens, adj_matrixs, batch_dep_heads, tags, batch_dep_label):
+        features = self.neural_scoring(words, word_seq_lens, chars, char_seq_lens, adj_matrixs, batch_dep_heads, batch_dep_label)
 
         all_scores = self.calculate_all_scores(features)
 
@@ -192,8 +207,8 @@ class NNCRF(nn.Module):
         return bestScores, decodeIdx
 
     def decode(self, batchInput):
-        wordSeqTensor, wordSeqLengths, charSeqTensor, charSeqLengths, adj_matrixs, tagSeqTensor, batch_dep_label = batchInput
-        features = self.neural_scoring(wordSeqTensor, wordSeqLengths,charSeqTensor,charSeqLengths, adj_matrixs, batch_dep_label)
+        wordSeqTensor, wordSeqLengths, charSeqTensor, charSeqLengths, adj_matrixs, batch_dep_heads, tagSeqTensor, batch_dep_label = batchInput
+        features = self.neural_scoring(wordSeqTensor, wordSeqLengths,charSeqTensor,charSeqLengths, adj_matrixs, batch_dep_heads, batch_dep_label)
         all_scores = self.calculate_all_scores(features)
         bestScores, decodeIdx = self.viterbiDecode(all_scores, wordSeqLengths)
         return bestScores, decodeIdx
