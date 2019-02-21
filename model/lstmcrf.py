@@ -104,6 +104,8 @@ class NNCRF(nn.Module):
                 dep_emb = self.dep_label_embedding(dep_label_tensor)[permIdx]
                 gcn_input = torch.cat([feature_out, dep_emb], 2)
                 feature_out = self.gcn(gcn_input, sorted_seq_len, adj_matrixs[permIdx])
+            # elif self.dep_method == DepMethod.tree_lstm:
+
 
 
         outputs = self.hidden2tag(feature_out)
@@ -149,13 +151,16 @@ class NNCRF(nn.Module):
 
         ## all the scores to current labels: batch, seq_len, all_from_label?
         currentTagScores = torch.gather(all_scores, 3, tags.view(batchSize, sentLength, 1, 1).expand(batchSize, sentLength, self.label_size, 1)).view(batchSize, -1, self.label_size)
-        tagTransScoresMiddle = torch.gather(currentTagScores[:, 1:, :], 2, tags[:, : sentLength - 1].view(batchSize, sentLength - 1, 1)).view(batchSize, -1)
+        if sentLength != 1:
+            tagTransScoresMiddle = torch.gather(currentTagScores[:, 1:, :], 2, tags[:, : sentLength - 1].view(batchSize, sentLength - 1, 1)).view(batchSize, -1)
         tagTransScoresBegin = currentTagScores[:, 0, self.start_idx]
         endTagIds = torch.gather(tags, 1, word_seq_lens.view(batchSize, 1) - 1)
         tagTransScoresEnd = torch.gather(self.transition[:, self.end_idx].view(1, self.label_size).expand(batchSize, self.label_size), 1,  endTagIds).view(batchSize)
+        score = torch.sum(tagTransScoresBegin) + torch.sum(tagTransScoresEnd)
+        if sentLength != 1:
+            score += torch.sum(tagTransScoresMiddle.masked_select(masks[:, 1:]))
+        return score
 
-        return torch.sum(tagTransScoresBegin) + torch.sum(tagTransScoresMiddle.masked_select(masks[:, 1:])) + torch.sum(
-            tagTransScoresEnd)
 
 
     def neg_log_obj(self, words, word_seq_lens, chars, char_seq_lens, adj_matrixs, batch_dep_heads, tags, batch_dep_label):
