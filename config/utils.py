@@ -74,6 +74,7 @@ def simple_batching(config, insts: List[Instance]):
     char_seq_len = char_seq_len.to(config.device)
     if config.use_head:
         adjs = adjs.to(config.device)
+        batch_dep_heads = batch_dep_heads.to(config.device)
         dep_label_tensor = dep_label_tensor.to(config.device)
 
     return word_seq_tensor, word_seq_len, char_seq_tensor, char_seq_len, adjs, batch_dep_heads, label_seq_tensor, dep_label_tensor
