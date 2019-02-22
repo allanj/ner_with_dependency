@@ -18,7 +18,8 @@ class GCN(nn.Module):
         self.layers = self.num_gcn_layers
         self.device = config.device
         self.mem_dim = self.gcn_hidden_dim
-        self.in_dim = config.hidden_dim + config.dep_emb_size ## lstm hidden dim
+        # self.in_dim = config.hidden_dim + config.dep_emb_size  ## lstm hidden dim
+        self.in_dim = config.hidden_dim  ## lstm hidden dim
 
         self.gcn_drop = nn.Dropout(config.gcn_dropout).to(self.device)
 

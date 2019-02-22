@@ -42,7 +42,7 @@ class NNCRF(nn.Module):
         # self.word_embedding.weight.data.copy_(torch.from_numpy(config.word_embedding))
         self.word_drop = nn.Dropout(config.dropout).to(self.device)
 
-        if self.use_head and self.dep_method == DepMethod.feat_emb:
+        if self.use_head and (self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.gcn):
             self.input_size += config.embedding_dim + config.dep_emb_size
 
 
@@ -82,10 +82,11 @@ class NNCRF(nn.Module):
             char_features = self.char_feature.get_last_hiddens(char_inputs, char_seq_lens)
             word_emb = torch.cat([word_emb, char_features], 2)
         if self.use_head:
-            if self.dep_method == DepMethod.feat_emb:
+            if self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.gcn:
                 dep_head_emb = self.word_embedding(dep_head_tensor)
                 dep_emb = self.dep_label_embedding(dep_label_tensor)
                 word_emb = torch.cat([word_emb, dep_head_emb, dep_emb], 2)
+
         word_rep = self.word_drop(word_emb)
 
         sorted_seq_len, permIdx = word_seq_lens.sort(0, descending=True)
@@ -101,9 +102,10 @@ class NNCRF(nn.Module):
         if self.use_head:
 
             if self.dep_method == DepMethod.gcn:
-                dep_emb = self.dep_label_embedding(dep_label_tensor)[permIdx]
-                gcn_input = torch.cat([feature_out, dep_emb], 2)
-                feature_out = self.gcn(gcn_input, sorted_seq_len, adj_matrixs[permIdx])
+                # dep_emb = self.dep_label_embedding(dep_label_tensor)[permIdx]
+                # gcn_input = torch.cat([feature_out, dep_emb], 2)
+                # feature_out = self.gcn(gcn_input, sorted_seq_len, adj_matrixs[permIdx])
+                feature_out = self.gcn(feature_out, sorted_seq_len, adj_matrixs[permIdx])
             # elif self.dep_method == DepMethod.tree_lstm:
 
 
