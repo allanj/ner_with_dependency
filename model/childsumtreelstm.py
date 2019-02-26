@@ -61,7 +61,6 @@ class ChildSumTreeLSTM(nn.Module):
         _, final_h[tree.pos] = tree.state
 
     def forward(self, tree, inputs):
-        inputs = inputs.squeeze(0)
         num_words = inputs.size(0)
         final_h = torch.zeros(num_words, self.mem_dim).to(self.device)
         self.forward_recursive(tree, inputs, final_h)
