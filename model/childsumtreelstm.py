@@ -11,10 +11,10 @@ class ChildSumTreeLSTM(nn.Module):
         self.in_dim = in_dim
         self.mem_dim = mem_dim
         self.device = config.device
-        self.ioux = nn.Linear(self.in_dim, 3 * self.mem_dim)
-        self.iouh = nn.Linear(self.mem_dim, 3 * self.mem_dim)
-        self.fx = nn.Linear(self.in_dim, self.mem_dim)
-        self.fh = nn.Linear(self.mem_dim, self.mem_dim)
+        self.ioux = nn.Linear(self.in_dim, 3 * self.mem_dim).to(config.device)
+        self.iouh = nn.Linear(self.mem_dim, 3 * self.mem_dim).to(config.device)
+        self.fx = nn.Linear(self.in_dim, self.mem_dim).to(config.device)
+        self.fh = nn.Linear(self.mem_dim, self.mem_dim).to(config.device)
 
     def node_forward(self, inputs, child_c, child_h):
         """
@@ -63,6 +63,6 @@ class ChildSumTreeLSTM(nn.Module):
     def forward(self, tree, inputs):
         inputs = inputs.squeeze(0)
         num_words = inputs.size(0)
-        final_h = torch.zeros(num_words, self.mem_dim)
+        final_h = torch.zeros(num_words, self.mem_dim).to(self.device)
         self.forward_recursive(tree, inputs, final_h)
         return final_h
