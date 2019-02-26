@@ -11,7 +11,7 @@ class GCN(nn.Module):
     def __init__(self, config):
         super().__init__()
 
-        self.gcn_hidden_dim = config.gcn_hidden_dim
+        self.gcn_hidden_dim = config.dep_hidden_dim
         self.num_gcn_layers = config.num_gcn_layers
         self.gcn_mlp_layers = config.gcn_mlp_layers
         # gcn layer

@@ -39,11 +39,16 @@ class ChildSumTreeLSTM(nn.Module):
         h = torch.mul(o, F.tanh(c))
         return c, h
 
-    def forward(self, tree, inputs):
-        for idx in range(tree.num_children):
-            self.forward(tree.children[idx], inputs)
+    def forward_recursive(self, tree, inputs, final_h):
+        """
+        :param tree: tree object
+        :param inputs: sentlen x hidden size.
+        :return:
+        """
+        for child in tree.children:
+            self.forward_recursive(child, inputs, final_h)
 
-        if tree.num_children == 0:
+        if len(tree.children) == 0:
             # child_c = inputs[0].detach().new(1, self.mem_dim).fill_(0.).requires_grad_()
             # child_h = inputs[0].detach().new(1, self.mem_dim).fill_(0.).requires_grad_()
             child_c = torch.zeros(1, self.mem_dim).to(self.device)
@@ -53,4 +58,11 @@ class ChildSumTreeLSTM(nn.Module):
             child_c, child_h = torch.cat(child_c, dim=0), torch.cat(child_h, dim=0)
 
         tree.state = self.node_forward(inputs[tree.pos], child_c, child_h)
-        return tree.state
+        _, final_h[tree.pos] = tree.state
+
+    def forward(self, tree, inputs):
+        inputs = inputs.squeeze(0)
+        num_words = inputs.size(0)
+        final_h = torch.zeros(num_words, self.mem_dim)
+        self.forward_recursive(tree, inputs, final_h)
+        return final_h

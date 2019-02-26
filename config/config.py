@@ -9,6 +9,7 @@ from common.instance import Instance
 from config.utils import PAD, START, STOP, ROOT
 import torch
 from enum import Enum
+from common.tree import Tree
 
 class DepMethod(Enum):
     none = 0
@@ -95,7 +96,7 @@ class Config:
         self.use_head = args.use_head
         self.dep_method = DepMethod[args.dep_method]
 
-        self.gcn_hidden_dim = args.gcn_hidden_dim
+        self.dep_hidden_dim = args.dep_hidden_dim
         self.num_gcn_layers = args.num_gcn_layers
         self.gcn_mlp_layers = args.gcn_mlp_layers
         self.gcn_dropout = args.gcn_dropout
@@ -288,6 +289,19 @@ class Config:
             insts_ids.append([inst.word_ids, inst.char_ids, inst.output_ids])
         return insts_ids
 
+    def build_trees(self, insts: List[Instance]):
+        for inst in insts:
+            nodes = [Tree(pos) for pos in range(len(inst.input.words))]
+            root = Tree(-1)
+            for pos, head in enumerate(inst.input.heads):
+                if head != -1:
+                    nodes[head].add_child(nodes[pos])
+                else:
+                    root.add_child(nodes[pos])
+            inst.nodes = nodes
+            for node in nodes:
+                node.sort_children()
+            inst.tree = root.children[0] ## the first root in the dependency tree.
 
 
     def find_singleton(self, train_insts):

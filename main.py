@@ -53,7 +53,7 @@ def parse_arguments(parser):
     ##model hyperparameter
     parser.add_argument('--hidden_dim', type=int, default=200, help="hidden size of the LSTM")
     parser.add_argument('--dep_emb_size', type=int, default=50, help="embedding size of dependency")
-    parser.add_argument('--gcn_hidden_dim', type=int, default=200, help="gcn hidden size")
+    parser.add_argument('--dep_hidden_dim', type=int, default=200, help="hidden size of gcn, tree lstm")
     parser.add_argument('--num_gcn_layers', type=int, default=2, help="number of gcn layers")
     parser.add_argument('--gcn_mlp_layers', type=int, default=1, help="number of mlp layers after gcn")
     parser.add_argument('--gcn_dropout', type=float,default=0.5, help="GCN dropout")
@@ -126,8 +126,8 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
         for index in np.random.permutation(len(batched_data)):
         # for index in range(len(batched_data)):
             model.train()
-            batch_word, batch_wordlen, batch_char, batch_charlen, adj_matrixs, batch_dep_heads, batch_label, batch_dep_label = batched_data[index]
-            loss = model.neg_log_obj(batch_word, batch_wordlen,batch_char, batch_charlen, adj_matrixs, batch_dep_heads, batch_label, batch_dep_label)
+            batch_word, batch_wordlen, batch_char, batch_charlen, adj_matrixs, batch_dep_heads, trees, batch_label, batch_dep_label = batched_data[index]
+            loss = model.neg_log_obj(batch_word, batch_wordlen,batch_char, batch_charlen, adj_matrixs, batch_dep_heads, batch_label, batch_dep_label, trees)
             epoch_loss += loss.item()
             loss.backward()
             # # torch.nn.utils.clip_grad_norm_(model.parameters(), config.clip) ##clipping the gradient
@@ -234,6 +234,11 @@ def main():
     conf.build_deplabel_idx(tests)
     print("# deplabels: ", conf.deplabels)
     print("dep label 2idx: ", conf.deplabel2idx)
+
+    conf.build_trees(trains)
+    conf.build_trees(devs)
+    conf.build_trees(tests)
+
 
     conf.build_word_idx(trains, tests, devs)
     conf.build_emb_table()

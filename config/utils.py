@@ -50,12 +50,14 @@ def simple_batching(config, insts: List[Instance]):
     adjs = None
     dep_label_tensor = None
     batch_dep_heads = None
+    trees = None
     if config.use_head:
         adjs = [ head_to_adj(max_seq_len, inst) for inst in batch_data]
         adjs = np.stack(adjs, axis=0)
         adjs = torch.from_numpy(adjs)
         batch_dep_heads = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
         dep_label_tensor = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
+        trees = [inst.tree for inst in batch_data]
     for idx in range(batch_size):
         word_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].word_ids)
         label_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].output_ids)
@@ -77,7 +79,7 @@ def simple_batching(config, insts: List[Instance]):
         batch_dep_heads = batch_dep_heads.to(config.device)
         dep_label_tensor = dep_label_tensor.to(config.device)
 
-    return word_seq_tensor, word_seq_len, char_seq_tensor, char_seq_len, adjs, batch_dep_heads, label_seq_tensor, dep_label_tensor
+    return word_seq_tensor, word_seq_len, char_seq_tensor, char_seq_len, adjs, batch_dep_heads, trees, label_seq_tensor, dep_label_tensor
 
 
 
