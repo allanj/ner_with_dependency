@@ -3,7 +3,6 @@
 #
 import torch.nn as nn
 import torch
-import torch.nn.functional as F
 
 class ChildSumTreeLSTM(nn.Module):
     def __init__(self, config, in_dim, mem_dim):
@@ -27,16 +26,16 @@ class ChildSumTreeLSTM(nn.Module):
 
         iou = self.ioux(inputs) + self.iouh(child_h_sum)
         i, o, u = torch.split(iou, iou.size(1) // 3, dim=1)
-        i, o, u = F.sigmoid(i), F.sigmoid(o), F.tanh(u)
+        i, o, u = torch.sigmoid(i), torch.sigmoid(o), torch.tanh(u)
 
-        f = F.sigmoid(
+        f = torch.sigmoid(
             self.fh(child_h) +
             self.fx(inputs).repeat(len(child_h), 1)
         )
         fc = torch.mul(f, child_c)
 
         c = torch.mul(i, u) + torch.sum(fc, dim=0, keepdim=True)
-        h = torch.mul(o, F.tanh(c))
+        h = torch.mul(o, torch.tanh(c))
         return c, h
 
     def forward_recursive(self, tree, inputs, final_h):
