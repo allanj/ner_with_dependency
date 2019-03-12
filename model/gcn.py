@@ -8,7 +8,7 @@ import torch.nn.functional as F
 
 
 class GCN(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, input_dim):
         super().__init__()
 
         self.gcn_hidden_dim = config.dep_hidden_dim
@@ -19,9 +19,9 @@ class GCN(nn.Module):
         self.device = config.device
         self.mem_dim = self.gcn_hidden_dim
         # self.in_dim = config.hidden_dim + config.dep_emb_size  ## lstm hidden dim
-        self.in_dim = config.hidden_dim  ## lstm hidden dim
+        self.in_dim = input_dim  ## lstm hidden dim
 
-        print("[Model Info] # GCN Layers: {}, #MLP: {}".format(self.num_gcn_layers, config.gcn_mlp_layers))
+        print("[Model Info] GCN Input Size: {}, # GCN Layers: {}, #MLP: {}".format(self.in_dim, self.num_gcn_layers, config.gcn_mlp_layers))
         self.gcn_drop = nn.Dropout(config.gcn_dropout).to(self.device)
 
         # gcn layer

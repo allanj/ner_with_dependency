@@ -43,27 +43,43 @@ class NNCRF(nn.Module):
         # self.word_embedding.weight.data.copy_(torch.from_numpy(config.word_embedding))
         self.word_drop = nn.Dropout(config.dropout).to(self.device)
 
-        # if self.use_head:
-        if self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.tree_lstm:
-            self.input_size += config.embedding_dim + config.dep_emb_size
-        elif self.dep_method == DepMethod.gcn:
+        """
+            Input size to LSTM description
+        """
+        if self.dep_method == DepMethod.feat_head_only:
             self.input_size += config.embedding_dim
+        elif self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.tree_lstm:
+            self.input_size += config.embedding_dim + config.dep_emb_size
+        # elif self.dep_method == DepMethod.gcn:
+        #     self.input_size += config.embedding_dim
+
         print("[Model Info] Input size to LSTM: {}".format(self.input_size))
         print("[Model Info] LSTM Hidden Size: {}".format(config.hidden_dim))
 
         self.lstm = nn.LSTM(self.input_size, config.hidden_dim // 2, num_layers=1, batch_first=True, bidirectional=True).to(self.device)
-        self.hidden2tag = nn.Linear(config.hidden_dim, self.label_size).to(self.device)
+
         self.drop_lstm = nn.Dropout(config.dropout).to(self.device)
 
 
-        # if self.use_head:
+        final_hidden_dim = config.hidden_dim
+        """
+        Model description
+        """
         print("[Model Info] Dep Method: {}, hidden size: {}".format(self.dep_method.name, config.dep_hidden_dim))
-        if self.dep_method != DepMethod.none:
+        if self.dep_method != DepMethod.none and self.dep_method != DepMethod.feat_head_only:
             self.dep_label_embedding = nn.Embedding(len(config.deplabel2idx), config.dep_emb_size).to(self.device)
-            if self.dep_method == DepMethod.gcn:
-                self.dep_nn = GCN(config)
+            if self.dep_method == DepMethod.lstm_gcn:
+                self.dep_nn = GCN(config, config.hidden_dim) ### lstm hidden as the input dimension
+                final_hidden_dim = config.dep_hidden_dim
+            elif self.dep_method == DepMethod.lstm_label_gcn:
+                self.dep_nn = GCN(config, config.hidden_dim + config.dep_emb_size)  ### lstm hidden+dep label emb as the input dimension
+                final_hidden_dim = config.dep_hidden_dim
             elif self.dep_method == DepMethod.tree_lstm:
                 self.dep_nn = ChildSumTreeLSTM(config, config.hidden_dim, config.dep_hidden_dim)
+                final_hidden_dim = config.dep_hidden_dim
+
+        print("[Model Info] Final Hidden Size: {}".format(final_hidden_dim))
+        self.hidden2tag = nn.Linear(final_hidden_dim, self.label_size).to(self.device)
 
         init_transition = torch.randn(self.label_size, self.label_size).to(self.device)
         init_transition[:, self.start_idx] = -10000.0
@@ -91,13 +107,19 @@ class NNCRF(nn.Module):
             char_features = self.char_feature.get_last_hiddens(char_inputs, char_seq_lens)
             word_emb = torch.cat([word_emb, char_features], 2)
         # if self.use_head:
-        if self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.tree_lstm:
+        """
+          Word Representation
+        """
+        if self.dep_method == DepMethod.feat_head_only:
+            dep_head_emb = self.word_embedding(dep_head_tensor)
+            word_emb = torch.cat([word_emb, dep_head_emb], 2)
+        elif self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.tree_lstm:
             dep_head_emb = self.word_embedding(dep_head_tensor)
             dep_emb = self.dep_label_embedding(dep_label_tensor)
             word_emb = torch.cat([word_emb, dep_head_emb, dep_emb], 2)
-        elif self.dep_method == DepMethod.gcn:
-            dep_head_emb = self.word_embedding(dep_head_tensor)
-            word_emb = torch.cat([word_emb, dep_head_emb], 2)
+        # elif self.dep_method == DepMethod.gcn:
+        #     dep_head_emb = self.word_embedding(dep_head_tensor)
+        #     word_emb = torch.cat([word_emb, dep_head_emb], 2)
 
         word_rep = self.word_drop(word_emb)
 
@@ -111,13 +133,18 @@ class NNCRF(nn.Module):
         feature_out = self.drop_lstm(lstm_out)
         ### TODO: dropout this lstm output or not, because ABB code do dropout.
 
-        # if self.use_head:
-
-        if self.dep_method == DepMethod.gcn:
+        """
+        Model forward
+        """
+        if self.dep_method == DepMethod.lstm_gcn:
             # dep_emb = self.dep_label_embedding(dep_label_tensor)[permIdx]
             # gcn_input = torch.cat([feature_out, dep_emb], 2)
             # feature_out = self.gcn(gcn_input, sorted_seq_len, adj_matrixs[permIdx])
             feature_out = self.dep_nn(feature_out, sorted_seq_len, adj_matrixs[permIdx])
+        elif self.dep_method == DepMethod.lstm_label_gcn:
+            dep_emb = self.dep_label_embedding(dep_label_tensor)[permIdx]
+            gcn_input = torch.cat([feature_out, dep_emb], 2)
+            feature_out = self.dep_nn(gcn_input, sorted_seq_len, adj_matrixs[permIdx])
         elif self.dep_method == DepMethod.tree_lstm:
             feature_out = self.dep_nn(trees[0], feature_out[0]).unsqueeze(0)  ## batch size has to be 1 for tree lstm.
 

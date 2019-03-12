@@ -13,10 +13,12 @@ from common.tree import Tree
 
 class DepMethod(Enum):
     none = 0
-    feat_emb = 1
-    tree_lstm = 2
-    gcn = 3
-    selfattn = 4
+    feat_head_only = 1
+    feat_emb = 2
+    tree_lstm = 3
+    lstm_gcn = 4 ## pure gcn, LSTM -> GCN, not using label embedding.
+    lstm_label_gcn = 5 ## pure gcn, LSTM -> GCN, using label embedding after lstm.
+    selfattn = 6
 
 
 
