@@ -58,7 +58,7 @@ def parse_arguments(parser):
     parser.add_argument('--gcn_mlp_layers', type=int, default=1, help="number of mlp layers after gcn")
     parser.add_argument('--gcn_dropout', type=float, default=0.5, help="GCN dropout")
     parser.add_argument('--gcn_adj_directed', type=int, default=1, choices=[0, 1], help="GCN ajacent matrix directed")
-    parser.add_argument('--gcn_adj_selfloop', type=int, default=1, choices=[0, 1], help="GCN selfloop in adjacent matrix")
+    parser.add_argument('--gcn_adj_selfloop', type=int, default=0, choices=[0, 1], help="GCN selfloop in adjacent matrix")
 
     ##NOTE: this dropout applies to many places
     parser.add_argument('--dropout', type=float, default=0.5, help="dropout for embedding")
