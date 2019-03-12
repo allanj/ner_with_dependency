@@ -1,8 +1,8 @@
 import numpy as np
-# import dynet as dy
 import torch
 from typing import List
 from common.instance import Instance
+
 
 START = "<START>"
 STOP = "<STOP>"
@@ -24,6 +24,7 @@ def log_sum_exp_pytorch(vec):
 
 
 def simple_batching(config, insts: List[Instance]):
+    from config.config import DepMethod
     """
 
     :param config:
@@ -51,8 +52,8 @@ def simple_batching(config, insts: List[Instance]):
     dep_label_tensor = None
     batch_dep_heads = None
     trees = None
-    if config.use_head:
-        adjs = [ head_to_adj(max_seq_len, inst) for inst in batch_data]
+    if config.dep_method != DepMethod.none:
+        adjs = [ head_to_adj(max_seq_len, inst, config) for inst in batch_data]
         adjs = np.stack(adjs, axis=0)
         adjs = torch.from_numpy(adjs)
         batch_dep_heads = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
@@ -61,7 +62,7 @@ def simple_batching(config, insts: List[Instance]):
     for idx in range(batch_size):
         word_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].word_ids)
         label_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].output_ids)
-        if config.use_head:
+        if config.dep_method != DepMethod.none:
             dep_label_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].dep_head_ids)
             dep_label_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].dep_label_ids)
         for word_idx in range(word_seq_len[idx]):
@@ -74,7 +75,7 @@ def simple_batching(config, insts: List[Instance]):
     char_seq_tensor = char_seq_tensor.to(config.device)
     word_seq_len = word_seq_len.to(config.device)
     char_seq_len = char_seq_len.to(config.device)
-    if config.use_head:
+    if config.dep_method != DepMethod.none:
         adjs = adjs.to(config.device)
         batch_dep_heads = batch_dep_heads.to(config.device)
         dep_label_tensor = dep_label_tensor.to(config.device)
@@ -92,10 +93,12 @@ def lr_decay(config, optimizer, epoch):
 
 
 
-def head_to_adj(max_len, inst, directed=False, self_loop=False):
+def head_to_adj(max_len, inst, config, directed=False, self_loop=False):
     """
     Convert a tree object to an (numpy) adjacency matrix.
     """
+    directed = config.adj_directed
+    self_loop = config.adj_self_loop
     ret = np.zeros((max_len, max_len), dtype=np.float32)
 
     for i, head in enumerate(inst.input.heads):

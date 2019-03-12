@@ -56,12 +56,14 @@ def parse_arguments(parser):
     parser.add_argument('--dep_hidden_dim', type=int, default=200, help="hidden size of gcn, tree lstm")
     parser.add_argument('--num_gcn_layers', type=int, default=2, help="number of gcn layers")
     parser.add_argument('--gcn_mlp_layers', type=int, default=1, help="number of mlp layers after gcn")
-    parser.add_argument('--gcn_dropout', type=float,default=0.5, help="GCN dropout")
+    parser.add_argument('--gcn_dropout', type=float, default=0.5, help="GCN dropout")
+    parser.add_argument('--gcn_adj_directed', type=int, default=1, choices=[0, 1], help="GCN ajacent matrix directed")
+    parser.add_argument('--gcn_adj_selfloop', type=int, default=1, choices=[0, 1], help="GCN selfloop in adjacent matrix")
 
     ##NOTE: this dropout applies to many places
     parser.add_argument('--dropout', type=float, default=0.5, help="dropout for embedding")
     parser.add_argument('--use_char_rnn', type=int, default=1, choices=[0, 1], help="use character-level lstm, 0 or 1")
-    parser.add_argument('--use_head', type=int, default=0, choices=[0, 1], help="not use dependency")
+    # parser.add_argument('--use_head', type=int, default=0, choices=[0, 1], help="not use dependency")
     parser.add_argument('--dep_method',type=str, default="none", help="dependency method")
     parser.add_argument('--use_elmo', type=int, default=0, choices=[0, 1], help="use Elmo embedding or not")
 
@@ -113,8 +115,8 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
     best_dev = [-1, 0]
     best_test = [-1, 0]
 
-    model_name = "model_files/lstm_{}_crf_{}_{}_head_{}_elmo_{}.m".format(config.hidden_dim, config.dataset, config.train_num, config.use_head, config.use_elmo)
-    res_name = "results/lstm_{}_crf_{}_{}_head_{}_elmo_{}.results".format(config.hidden_dim, config.dataset, config.train_num, config.use_head, config.use_elmo)
+    model_name = "model_files/lstm_{}_crf_{}_{}_dep_{}_elmo_{}.m".format(config.hidden_dim, config.dataset, config.train_num, config.dep_method.name, config.use_elmo)
+    res_name = "results/lstm_{}_crf_{}_{}_dep_{}_elmo_{}.results".format(config.hidden_dim, config.dataset, config.train_num, config.dep_method.name, config.use_elmo)
     print("[Info] The model will be saved to: %s, please ensure models folder exist" % (model_name))
 
     for i in range(1, epoch + 1):
@@ -240,7 +242,7 @@ def main():
     conf.build_trees(tests)
 
 
-    conf.build_word_idx(trains, tests, devs)
+    conf.build_word_idx(trains, devs, tests)
     conf.build_emb_table()
 
     conf.find_singleton(trains)

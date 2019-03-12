@@ -22,18 +22,21 @@ device=cuda:2
 gcn_layer=2
 gcn_dropout=0.5
 gcn_mlp_layers=1
-dep_method=tree_lstm
+dep_method=gcn
 dep_hidden_dim=200
 affix=sd
+gcn_adj_directed=1
+gcn_adj_selfloop=1
 
 for (( d=0; d<${#datasets[@]}; d++  )) do
     dataset=${datasets[$d]}
     for (( h=0; h<${#heads[@]}; h++  )) do
         head=${heads[$h]}
+        logfile=logs/hidden_${hidden}_${dataset}_${affix}_head_${head}_${dep_method}_asfeat_elmo_${elmo}_gcn_${gcn_layer}_${gcn_mlp_layers}_${gcn_dropout}.log
         python3.6 main.py --use_head ${head} --use_elmo ${elmo} --hidden_dim ${hidden} --optimizer ${optim}\
           --dataset ${dataset}  --eval_freq ${eval_freq} --num_epochs ${num_epochs} --device ${device} --dep_hidden_dim ${dep_hidden_dim} \
           --batch_size ${batch} --num_gcn_layers ${gcn_layer} --gcn_mlp_layers ${gcn_mlp_layers} --dep_method ${dep_method} \
-          --gcn_dropout ${gcn_dropout} --affix ${affix} > logs/hidden_${hidden}_${dataset}_${affix}_head_${head}_${dep_method}_asfeat_elmo_${elmo}_gcn_${gcn_layer}_${gcn_mlp_layers}_${gcn_dropout}.log 2>&1
+          --gcn_dropout ${gcn_dropout} --affix ${affix} > ${logfile} 2>&1
     done
 done
 

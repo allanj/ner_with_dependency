@@ -44,7 +44,6 @@ class Config:
         self.digit2zero = args.digit2zero
 
         self.dataset = args.dataset
-
         # self.train_file = "data/" + self.dataset + "/train.txt"
         # self.dev_file = "data/" + self.dataset + "/dev.txt"
         # ## following datasets do not have development set
@@ -93,13 +92,15 @@ class Config:
         self.char_emb_size = 30
         self.charlstm_hidden_dim = 50
         self.use_char_rnn = args.use_char_rnn
-        self.use_head = args.use_head
+        # self.use_head = args.use_head
         self.dep_method = DepMethod[args.dep_method]
 
         self.dep_hidden_dim = args.dep_hidden_dim
         self.num_gcn_layers = args.num_gcn_layers
         self.gcn_mlp_layers = args.gcn_mlp_layers
         self.gcn_dropout = args.gcn_dropout
+        self.adj_directed = args.gcn_adj_directed
+        self.adj_self_loop = args.gcn_adj_selfloop
 
         self.dep_emb_size = args.dep_emb_size
         self.deplabel2idx = {}

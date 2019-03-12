@@ -21,6 +21,7 @@ class GCN(nn.Module):
         # self.in_dim = config.hidden_dim + config.dep_emb_size  ## lstm hidden dim
         self.in_dim = config.hidden_dim  ## lstm hidden dim
 
+        print("[Model Info] # GCN Layers: {}, #MLP: {}".format(self.num_gcn_layers, config.gcn_mlp_layers))
         self.gcn_drop = nn.Dropout(config.gcn_dropout).to(self.device)
 
         # gcn layer
