@@ -7,19 +7,21 @@ import torch.nn.functional as F
 
 
 
-class SyntaxGCN(nn.Module):
-    def __init__(self, config):
+class SyntacticGCN(nn.Module):
+    def __init__(self, config, input_dim):
         super().__init__()
 
-        self.gcn_hidden_dim = config.gcn_hidden_dim
+        self.gcn_hidden_dim = config.dep_hidden_dim
         self.num_gcn_layers = config.num_gcn_layers
         self.gcn_mlp_layers = config.gcn_mlp_layers
         # gcn layer
         self.layers = self.num_gcn_layers
         self.device = config.device
         self.mem_dim = self.gcn_hidden_dim
-        self.in_dim = config.hidden_dim + config.dep_emb_size ## lstm hidden dim
+        # self.in_dim = config.hidden_dim + config.dep_emb_size  ## lstm hidden dim
+        self.in_dim = input_dim  ## lstm hidden dim
 
+        print("[Model Info] Syntactic GCN Input Size: {}, # GCN Layers: {}, #MLP: {}".format(self.in_dim, self.num_gcn_layers, config.gcn_mlp_layers))
         self.gcn_drop = nn.Dropout(config.gcn_dropout).to(self.device)
 
         # gcn layer
@@ -39,16 +41,25 @@ class SyntaxGCN(nn.Module):
 
 
 
-    def forward(self, gcn_inputs, word_seq_len, adj_matrix):
+    def forward(self, gcn_inputs, word_seq_len, out_matrix, in_matrix, ):
+        """
+
+        :param gcn_inputs: batch_size x N x input_size
+        :param word_seq_len:
+        :param out_matrix:
+        :param in_matrix:
+        :return:
+        """
 
         # print(adj_matrix.size())
 
         denom = adj_matrix.sum(2).unsqueeze(2) + 1
 
         for l in range(self.layers):
-            Ax = adj_matrix.bmm(gcn_inputs)
-            AxW = self.W[l](Ax)
+            Ax = adj_matrix.bmm(gcn_inputs)  ## batch_size x N x input_size
+            AxW = self.W[l](Ax)  ## with size..  batch_size x N x self.mem_dim.
             AxW = AxW + self.W[l](gcn_inputs)  # self loop
+            ## syntactic bias should be batch_size x N x self.mem_dim
             AxW = AxW / denom
 
             gAxW = F.relu(AxW)
