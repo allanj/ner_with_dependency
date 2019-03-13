@@ -50,8 +50,8 @@ class NNCRF(nn.Module):
             self.input_size += config.embedding_dim
         elif self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.tree_lstm:
             self.input_size += config.embedding_dim + config.dep_emb_size
-        # elif self.dep_method == DepMethod.gcn:
-        #     self.input_size += config.embedding_dim
+        elif self.dep_method == DepMethod.label_gcn_lstm:
+            self.input_size = config.dep_hidden_dim ##because gcn first, the input to lstm becomes the hidden size of gcn
 
         print("[Model Info] Input size to LSTM: {}".format(self.input_size))
         print("[Model Info] LSTM Hidden Size: {}".format(config.hidden_dim))
@@ -74,6 +74,12 @@ class NNCRF(nn.Module):
             elif self.dep_method == DepMethod.lstm_label_gcn:
                 self.dep_nn = GCN(config, config.hidden_dim + config.dep_emb_size)  ### lstm hidden+dep label emb as the input dimension
                 final_hidden_dim = config.dep_hidden_dim
+            elif self.dep_method == DepMethod.label_gcn_lstm:
+                input_size = config.embedding_dim + config.dep_emb_size
+                if self.use_char:
+                    input_size += config.charlstm_hidden_dim
+                self.dep_nn = GCN(config, input_size)  ### first component
+                # final_hidden_dim = config.dep_hidden_dim
             elif self.dep_method == DepMethod.tree_lstm:
                 self.dep_nn = ChildSumTreeLSTM(config, config.hidden_dim, config.dep_hidden_dim)
                 final_hidden_dim = config.dep_hidden_dim
@@ -123,9 +129,18 @@ class NNCRF(nn.Module):
 
         word_rep = self.word_drop(word_emb)
 
+
         sorted_seq_len, permIdx = word_seq_lens.sort(0, descending=True)
         _, recover_idx = permIdx.sort(0, descending=False)
         sorted_seq_tensor = word_rep[permIdx]
+
+        """
+        Model forward for gcn first
+        """
+        if self.dep_method == DepMethod.label_gcn_lstm:
+            dep_emb = self.dep_label_embedding(dep_label_tensor)[permIdx]
+            gcn_input = torch.cat([sorted_seq_tensor, dep_emb], 2)
+            sorted_seq_tensor = self.dep_nn(gcn_input, sorted_seq_len, adj_matrixs[permIdx])
 
         packed_words = pack_padded_sequence(sorted_seq_tensor, sorted_seq_len, True)
         lstm_out, _ = self.lstm(packed_words, None)

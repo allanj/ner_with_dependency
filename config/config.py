@@ -18,7 +18,9 @@ class DepMethod(Enum):
     tree_lstm = 3
     lstm_gcn = 4 ## pure gcn, LSTM -> GCN, not using label embedding.
     lstm_label_gcn = 5 ## pure gcn, LSTM -> GCN, using label embedding after lstm.
-    selfattn = 6
+    label_gcn_lstm = 6
+    selfattn=7
+
 
 
 
