@@ -1,7 +1,7 @@
 # 
 # @author: Allan
 #
-
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -29,7 +29,10 @@ class SyntacticGCN(nn.Module):
 
         for layer in range(self.layers):
             input_dim = self.in_dim if layer == 0 else self.mem_dim
-            self.W.append(nn.Linear(input_dim, self.mem_dim).to(self.device))
+            self.W.append([nn.Linear(input_dim, self.mem_dim,bias=False).to(self.device), nn.Linear(input_dim, self.mem_dim,bias=False).to(self.device)
+                            ,nn.Linear(input_dim, self.mem_dim,bias=False).to(self.device)] ) ##because of ->, self loop, <-
+
+        label_bias = nn.Parameter(torch.randn(len(config.deplabels), self.mem_dim))
 
         # output mlp layers
         in_dim = config.hidden_dim
@@ -53,7 +56,7 @@ class SyntacticGCN(nn.Module):
 
         # print(adj_matrix.size())
 
-        denom = adj_matrix.sum(2).unsqueeze(2) + 1
+        denom = adj_matrix.sum(2).unsqueeze(2) + 1 ##because of self loop plus 1
 
         for l in range(self.layers):
             Ax = adj_matrix.bmm(gcn_inputs)  ## batch_size x N x input_size
