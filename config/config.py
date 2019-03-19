@@ -10,6 +10,7 @@ from config.utils import PAD, START, STOP, ROOT
 import torch
 from enum import Enum
 from common.tree import Tree
+from termcolor import colored
 
 class DepMethod(Enum):
     none = 0
@@ -38,6 +39,9 @@ class Config:
         self.ROOT = ROOT
         self.UNK = "<UNK>"
         self.unk_id = -1
+        self.root_dep_label = "root"
+
+        print(colored("[Info] remember to chec the root dependency label if changing the data. current: {}".format(self.root_dep_label), "red"  ))
 
         # self.device = torch.device("cuda" if args.gpu else "cpu")
         self.embedding_file = args.embedding_file

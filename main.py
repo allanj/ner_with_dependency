@@ -103,7 +103,7 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
     optimizer = get_optimizer(config, model)
     train_num = len(train_insts)
     print("number of instances: %d" % (train_num))
-    print(colored("[Shuffled] Shuffle the training instance ids"))
+    print(colored("[Shuffled] Shuffle the training instance ids", "red"))
     random.shuffle(train_insts)
 
 
@@ -175,7 +175,7 @@ def evaluate(config:Config, model: NNCRF, batch_insts_ids, name:str):
     return [precision, recall, fscore]
 
 
-def test(config: Config, test_insts):
+def test_model(config: Config, test_insts):
     model_name = "model_files/lstm_{}_crf_{}_{}_head_{}_elmo_{}.m".format(config.hidden_dim, config.dataset, config.train_num, config.use_head, config.use_elmo)
     res_name = "results/lstm_{}_crf_{}_{}_head_{}_elmo_{}.results".format(config.hidden_dim, config.dataset, config.train_num, config.use_head, config.use_elmo)
     model = NNCRF(config)
@@ -260,7 +260,7 @@ def main():
         learn_from_insts(conf, conf.num_epochs, trains, devs, tests)
     else:
         ## Load the trained model.
-        test(conf, tests)
+        test_model(conf, tests)
         # pass
 
     print(opt.mode)
