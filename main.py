@@ -57,8 +57,8 @@ def parse_arguments(parser):
     parser.add_argument('--num_gcn_layers', type=int, default=2, help="number of gcn layers")
     parser.add_argument('--gcn_mlp_layers', type=int, default=1, help="number of mlp layers after gcn")
     parser.add_argument('--gcn_dropout', type=float, default=0.5, help="GCN dropout")
-    parser.add_argument('--gcn_adj_directed', type=int, default=1, choices=[0, 1], help="GCN ajacent matrix directed")
-    parser.add_argument('--gcn_adj_selfloop', type=int, default=0, choices=[0, 1], help="GCN selfloop in adjacent matrix")
+    parser.add_argument('--gcn_adj_directed', type=int, default=0, choices=[0, 1], help="GCN ajacent matrix directed")
+    parser.add_argument('--gcn_adj_selfloop', type=int, default=0, choices=[0, 1], help="GCN selfloop in adjacent matrix, now always false as add it in the model")
 
     ##NOTE: this dropout applies to many places
     parser.add_argument('--dropout', type=float, default=0.5, help="dropout for embedding")
@@ -128,8 +128,8 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
         for index in np.random.permutation(len(batched_data)):
         # for index in range(len(batched_data)):
             model.train()
-            batch_word, batch_wordlen, batch_char, batch_charlen, adj_matrixs, batch_dep_heads, trees, batch_label, batch_dep_label = batched_data[index]
-            loss = model.neg_log_obj(batch_word, batch_wordlen,batch_char, batch_charlen, adj_matrixs, batch_dep_heads, batch_label, batch_dep_label, trees)
+            batch_word, batch_wordlen, batch_char, batch_charlen, adj_matrixs, dep_label_adj, batch_dep_heads, trees, batch_label, batch_dep_label = batched_data[index]
+            loss = model.neg_log_obj(batch_word, batch_wordlen,batch_char, batch_charlen, adj_matrixs, dep_label_adj, batch_dep_heads, batch_label, batch_dep_label, trees)
             epoch_loss += loss.item()
             loss.backward()
             # # torch.nn.utils.clip_grad_norm_(model.parameters(), config.clip) ##clipping the gradient

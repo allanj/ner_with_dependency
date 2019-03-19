@@ -6,7 +6,7 @@ import numpy as np
 from tqdm import tqdm
 from typing import List
 from common.instance import Instance
-from config.utils import PAD, START, STOP, ROOT
+from config.utils import PAD, START, STOP, ROOT, ROOT_DEP_LABEL, SELF_DEP_LABEL
 import torch
 from enum import Enum
 from common.tree import Tree
@@ -18,9 +18,11 @@ class DepMethod(Enum):
     feat_emb = 2
     tree_lstm = 3
     lstm_gcn = 4 ## pure gcn, LSTM -> GCN, not using label embedding.
-    lstm_label_gcn = 5 ## pure gcn, LSTM -> GCN, using label embedding after lstm.
+    lstm_label_gcn = 5  ## pure gcn, LSTM -> GCN, using label embedding after lstm.
     label_gcn_lstm = 6
-    selfattn=7
+    lstm_lgcn = 7  ## LSTM to a gcn with dependency labeled
+    lgcn_lstm = 8
+    selfattn=9
 
 
 
@@ -39,7 +41,8 @@ class Config:
         self.ROOT = ROOT
         self.UNK = "<UNK>"
         self.unk_id = -1
-        self.root_dep_label = "root"
+        self.root_dep_label = ROOT_DEP_LABEL
+        self.self_label = SELF_DEP_LABEL
 
         print(colored("[Info] remember to chec the root dependency label if changing the data. current: {}".format(self.root_dep_label), "red"  ))
 
@@ -217,12 +220,15 @@ class Config:
                 self.word_embedding[self.word2idx[word], :] = np.random.uniform(-scale, scale, [1, self.embedding_dim])
 
     def build_deplabel_idx(self, insts):
+        if self.self_label not in self.deplabel2idx:
+            self.deplabels.append(self.self_label)
+            self.deplabel2idx[self.self_label] = len(self.deplabel2idx)
         for inst in insts:
             for label in inst.input.dep_labels:
                 if label not in self.deplabels:
                     self.deplabels.append(label)
                     self.deplabel2idx[label] = len(self.deplabel2idx)
-
+        self.root_dep_label_id = self.deplabel2idx[self.root_dep_label]
 
     def build_label_idx(self, insts):
         self.label2idx[self.PAD] = len(self.label2idx)

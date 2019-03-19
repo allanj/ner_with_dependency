@@ -9,6 +9,7 @@ from config.utils import START, STOP, PAD, log_sum_exp_pytorch
 from model.charbilstm import CharBiLSTM
 from model.gcn import GCN
 from model.childsumtreelstm import ChildSumTreeLSTM
+from model.deplabel_gcn import DepLabeledGCN
 from torch.nn.utils.rnn import  pack_padded_sequence, pad_packed_sequence
 from config.config import DepMethod
 
@@ -83,6 +84,9 @@ class NNCRF(nn.Module):
             elif self.dep_method == DepMethod.tree_lstm:
                 self.dep_nn = ChildSumTreeLSTM(config, config.hidden_dim, config.dep_hidden_dim)
                 final_hidden_dim = config.dep_hidden_dim
+            elif self.dep_method == DepMethod.lstm_lgcn:
+                self.dep_nn = DepLabeledGCN(config, config.hidden_dim )  ### lstm hidden size
+                final_hidden_dim = config.dep_hidden_dim
 
         print("[Model Info] Final Hidden Size: {}".format(final_hidden_dim))
         self.hidden2tag = nn.Linear(final_hidden_dim, self.label_size).to(self.device)
@@ -96,7 +100,7 @@ class NNCRF(nn.Module):
         self.transition = nn.Parameter(init_transition)
 
 
-    def neural_scoring(self, word_seq_tensor, word_seq_lens, char_inputs, char_seq_lens, adj_matrixs, dep_head_tensor, dep_label_tensor, trees=None):
+    def neural_scoring(self, word_seq_tensor, word_seq_lens, char_inputs, char_seq_lens, adj_matrixs, dep_label_adj, dep_head_tensor, dep_label_tensor, trees=None):
         """
         :param word_seq_tensor: (batch_size, sent_len)   NOTE: The word seq actually is already ordered before come here.
         :param word_seq_lens: (batch_size, 1)
@@ -156,6 +160,9 @@ class NNCRF(nn.Module):
             # gcn_input = torch.cat([feature_out, dep_emb], 2)
             # feature_out = self.gcn(gcn_input, sorted_seq_len, adj_matrixs[permIdx])
             feature_out = self.dep_nn(feature_out, sorted_seq_len, adj_matrixs[permIdx])
+        elif self.dep_method == DepMethod.lstm_lgcn:
+            feature_out = self.dep_nn(feature_out, sorted_seq_len, adj_matrixs[permIdx], dep_label_adj[permIdx])
+
         elif self.dep_method == DepMethod.lstm_label_gcn:
             dep_emb = self.dep_label_embedding(dep_label_tensor)[permIdx]
             gcn_input = torch.cat([feature_out, dep_emb], 2)
@@ -219,8 +226,8 @@ class NNCRF(nn.Module):
 
 
 
-    def neg_log_obj(self, words, word_seq_lens, chars, char_seq_lens, adj_matrixs, batch_dep_heads, tags, batch_dep_label, trees=None):
-        features = self.neural_scoring(words, word_seq_lens, chars, char_seq_lens, adj_matrixs, batch_dep_heads, batch_dep_label, trees)
+    def neg_log_obj(self, words, word_seq_lens, chars, char_seq_lens, adj_matrixs, dep_label_adj, batch_dep_heads, tags, batch_dep_label, trees=None):
+        features = self.neural_scoring(words, word_seq_lens, chars, char_seq_lens, adj_matrixs, dep_label_adj, batch_dep_heads, batch_dep_label, trees)
 
         all_scores = self.calculate_all_scores(features)
 
@@ -268,8 +275,8 @@ class NNCRF(nn.Module):
         return bestScores, decodeIdx
 
     def decode(self, batchInput):
-        wordSeqTensor, wordSeqLengths, charSeqTensor, charSeqLengths, adj_matrixs, batch_dep_heads, trees, tagSeqTensor, batch_dep_label = batchInput
-        features = self.neural_scoring(wordSeqTensor, wordSeqLengths,charSeqTensor,charSeqLengths, adj_matrixs, batch_dep_heads, batch_dep_label, trees)
+        wordSeqTensor, wordSeqLengths, charSeqTensor, charSeqLengths, adj_matrixs, dep_label_adj, batch_dep_heads, trees, tagSeqTensor, batch_dep_label = batchInput
+        features = self.neural_scoring(wordSeqTensor, wordSeqLengths,charSeqTensor,charSeqLengths, adj_matrixs, dep_label_adj, batch_dep_heads, batch_dep_label, trees)
         all_scores = self.calculate_all_scores(features)
         bestScores, decodeIdx = self.viterbiDecode(all_scores, wordSeqLengths)
         return bestScores, decodeIdx
