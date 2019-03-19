@@ -51,7 +51,7 @@ class NNCRF(nn.Module):
             self.input_size += config.embedding_dim
         elif self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.tree_lstm:
             self.input_size += config.embedding_dim + config.dep_emb_size
-        elif self.dep_method == DepMethod.label_gcn_lstm:
+        elif self.dep_method == DepMethod.label_gcn_lstm or self.dep_method == DepMethod.lgcn_lstm:
             self.input_size = config.dep_hidden_dim ##because gcn first, the input to lstm becomes the hidden size of gcn
 
         print("[Model Info] Input size to LSTM: {}".format(self.input_size))
@@ -87,6 +87,11 @@ class NNCRF(nn.Module):
             elif self.dep_method == DepMethod.lstm_lgcn:
                 self.dep_nn = DepLabeledGCN(config, config.hidden_dim )  ### lstm hidden size
                 final_hidden_dim = config.dep_hidden_dim
+            elif self.dep_method == DepMethod.lgcn_lstm:
+                input_size = config.embedding_dim
+                if self.use_char:
+                    input_size += config.charlstm_hidden_dim
+                self.dep_nn = DepLabeledGCN(config, input_size )  ### first component
 
         print("[Model Info] Final Hidden Size: {}".format(final_hidden_dim))
         self.hidden2tag = nn.Linear(final_hidden_dim, self.label_size).to(self.device)
@@ -145,6 +150,8 @@ class NNCRF(nn.Module):
             dep_emb = self.dep_label_embedding(dep_label_tensor)[permIdx]
             gcn_input = torch.cat([sorted_seq_tensor, dep_emb], 2)
             sorted_seq_tensor = self.dep_nn(gcn_input, sorted_seq_len, adj_matrixs[permIdx])
+        elif self.dep_method == DepMethod.lgcn_lstm:
+            sorted_seq_tensor = self.dep_nn(sorted_seq_tensor, sorted_seq_len, adj_matrixs[permIdx], dep_label_adj[permIdx])
 
         packed_words = pack_padded_sequence(sorted_seq_tensor, sorted_seq_len, True)
         lstm_out, _ = self.lstm(packed_words, None)
