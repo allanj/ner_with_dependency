@@ -35,7 +35,7 @@ class DepLabeledGCN(nn.Module):
             self.W.append(nn.Linear(input_dim, self.mem_dim).to(self.device))
             self.W_label.append(nn.Linear(input_dim, self.mem_dim).to(self.device))
 
-        self.dep_emb = nn.Embedding(len(config.deplabels), 1)
+        self.dep_emb = nn.Embedding(len(config.deplabels), 1).to(config.device)
 
         # output mlp layers
         in_dim = config.hidden_dim
