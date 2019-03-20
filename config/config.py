@@ -112,6 +112,7 @@ class Config:
         self.gcn_dropout = args.gcn_dropout
         self.adj_directed = args.gcn_adj_directed
         self.adj_self_loop = args.gcn_adj_selfloop
+        self.edge_gate = args.gcn_gate
 
         self.dep_emb_size = args.dep_emb_size
         self.deplabel2idx = {}

@@ -14,6 +14,7 @@ from config.utils import lr_decay, simple_batching
 from typing import List
 from common.instance import Instance
 from termcolor import colored
+import adabound
 
 
 def setSeed(opt, seed):
@@ -37,7 +38,7 @@ def parse_arguments(parser):
     parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
     # parser.add_argument('--embedding_file', type=str, default=None)
     parser.add_argument('--embedding_dim', type=int, default=100)
-    parser.add_argument('--optimizer', type=str, default="adam")
+    parser.add_argument('--optimizer', type=str, default="sgd")
     parser.add_argument('--learning_rate', type=float, default=0.015) ##only for sgd now
     parser.add_argument('--momentum', type=float, default=0.0)
     parser.add_argument('--l2', type=float, default=1e-8)
@@ -59,6 +60,7 @@ def parse_arguments(parser):
     parser.add_argument('--gcn_dropout', type=float, default=0.5, help="GCN dropout")
     parser.add_argument('--gcn_adj_directed', type=int, default=0, choices=[0, 1], help="GCN ajacent matrix directed")
     parser.add_argument('--gcn_adj_selfloop', type=int, default=0, choices=[0, 1], help="GCN selfloop in adjacent matrix, now always false as add it in the model")
+    parser.add_argument('--gcn_gate', type=int, default=0, choices=[0, 1], help="add edge_wise gating")
 
     ##NOTE: this dropout applies to many places
     parser.add_argument('--dropout', type=float, default=0.5, help="dropout for embedding")
@@ -79,9 +81,14 @@ def parse_arguments(parser):
 def get_optimizer(config: Config, model: nn.Module):
     params = model.parameters()
     if config.optimizer.lower() == "sgd":
+        print(colored("Using SGD: lr is: {}, weight decay is: {}".format(config.learning_rate, config.l2), 'yellow'))
         return optim.SGD(params, lr=config.learning_rate, weight_decay=float(config.l2))
     elif config.optimizer.lower() == "adam":
+        print(colored("Using Adam", 'yellow'))
         return optim.Adam(params)
+    elif config.optimizer.lower() == "adabound":
+        print(colored("Using adabound: lr is: {}, final lr is: {}".format(0.001, 0.1), 'yellow'))
+        return adabound.AdaBound(params, lr=1e-3, final_lr=0.1)
     else:
         print("Illegal optimizer: {}".format(config.optimizer))
         exit(1)
