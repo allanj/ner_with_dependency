@@ -28,6 +28,8 @@ affix=sd
 gcn_adj_directed=0
 gcn_adj_selfloop=0 ## keep to zero because we always add selfloop in gcn
 gcn_gate=0
+lr_decay=0
+learning_rate=0.01
 
 for (( d=0; d<${#datasets[@]}; d++  )) do
     dataset=${datasets[$d]}
@@ -35,7 +37,8 @@ for (( d=0; d<${#datasets[@]}; d++  )) do
     python3.6 main.py --use_elmo ${elmo} --hidden_dim ${hidden} --optimizer ${optim} --gcn_adj_directed ${gcn_adj_directed} --gcn_adj_selfloop ${gcn_adj_selfloop} \
       --dataset ${dataset}  --eval_freq ${eval_freq} --num_epochs ${num_epochs} --device ${device} --dep_hidden_dim ${dep_hidden_dim} \
       --batch_size ${batch} --num_gcn_layers ${gcn_layer} --gcn_mlp_layers ${gcn_mlp_layers} --dep_method ${dep_method} \
-      --gcn_dropout ${gcn_dropout} --affix ${affix} --gcn_gate ${gcn_gate} > ${logfile} 2>&1
+      --gcn_dropout ${gcn_dropout} --lr_decay ${lr_decay} --learning_rate ${learning_rate} \
+      --affix ${affix} --gcn_gate ${gcn_gate}  > ${logfile} 2>&1
 
 done
 

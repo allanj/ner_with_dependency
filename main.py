@@ -122,8 +122,8 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
     best_dev = [-1, 0]
     best_test = [-1, 0]
 
-    model_name = "model_files/lstm_{}_crf_{}_{}_dep_{}_elmo_{}.m".format(config.hidden_dim, config.dataset, config.train_num, config.dep_method.name, config.use_elmo)
-    res_name = "results/lstm_{}_crf_{}_{}_dep_{}_elmo_{}.results".format(config.hidden_dim, config.dataset, config.train_num, config.dep_method.name, config.use_elmo)
+    model_name = "model_files/lstm_{}_crf_{}_{}_dep_{}_elmo_{}_{}_gate_{}.m".format(config.hidden_dim, config.dataset, config.train_num, config.dep_method.name, config.use_elmo, config.optimizer.lower(), config.edge_gate)
+    res_name = "results/lstm_{}_crf_{}_{}_dep_{}_elmo_{}_{}_gate_{}.results".format(config.hidden_dim, config.dataset, config.train_num, config.dep_method.name, config.use_elmo, config.optimizer.lower(), config.edge_gate)
     print("[Info] The model will be saved to: %s, please ensure models folder exist" % (model_name))
 
     for i in range(1, epoch + 1):
