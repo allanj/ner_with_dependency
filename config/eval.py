@@ -60,7 +60,7 @@ def evaluate(insts):
     return [precision, recall, fscore]
 
 
-def evaluate_num(batch_pred_ids, batch_gold_ids, word_seq_lens, idx2label):
+def evaluate_num(batch_insts, batch_pred_ids, batch_gold_ids, word_seq_lens, idx2label):
 
     p = 0
     total_entity = 0
@@ -73,6 +73,7 @@ def evaluate_num(batch_pred_ids, batch_gold_ids, word_seq_lens, idx2label):
         prediction = prediction[::-1]
         output = [idx2label[l] for l in output]
         prediction =[idx2label[l] for l in prediction]
+        batch_insts[idx].prediction = prediction
         #convert to span
         output_spans = set()
         start = -1

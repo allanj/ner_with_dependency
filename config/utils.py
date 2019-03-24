@@ -39,7 +39,7 @@ def simple_batching(config, insts: List[Instance]):
         label_seq_tensor
     """
     batch_size = len(insts)
-    batch_data = sorted(insts, key=lambda inst: len(inst.input.words), reverse=True)
+    batch_data = sorted(insts, key=lambda inst: len(inst.input.words), reverse=True) ##object-based not direct copy
     word_seq_len = torch.LongTensor(list(map(lambda inst: len(inst.input.words), batch_data)))
     max_seq_len = word_seq_len.max()
     ### TODO: the 1 here might be used later?? We will make this as padding, because later we have to do a deduction.

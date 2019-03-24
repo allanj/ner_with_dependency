@@ -148,8 +148,8 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
 
         if i + 1 >= config.eval_epoch:
             model.eval()
-            dev_metrics = evaluate(config, model, dev_batches, "dev")
-            test_metrics = evaluate(config, model, test_batches, "test")
+            dev_metrics = evaluate(config, model, dev_batches, "dev", dev_insts)
+            test_metrics = evaluate(config, model, test_batches, "test", test_insts)
             if dev_metrics[2] > best_dev[0]:
                 print("saving the best model...")
                 best_dev[0] = dev_metrics[2]
@@ -157,6 +157,7 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
                 best_test[0] = test_metrics[2]
                 best_test[1] = i
                 torch.save(model.state_dict(), model_name)
+                write_results(res_name, test_insts)
             model.zero_grad()
 
     print("The best dev: %.2f" % (best_dev[0]))
@@ -164,16 +165,22 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
     print("Final testing.")
     model.load_state_dict(torch.load(model_name))
     model.eval()
-    evaluate(config, model, test_batches, "test")
+    evaluate(config, model, test_batches, "test", test_insts)
+    write_results(res_name, test_insts)
 
 
 
-def evaluate(config:Config, model: NNCRF, batch_insts_ids, name:str):
+def evaluate(config:Config, model: NNCRF, batch_insts_ids, name:str, insts: List[Instance]):
     ## evaluation
     metrics = np.asarray([0, 0, 0], dtype=int)
+    batch_id = 0
+    batch_size = config.batch_size
     for batch in batch_insts_ids:
+        one_batch_insts = insts[batch_id * batch_size:(batch_id + 1) * batch_size]
+        sorted_batch_insts = sorted(one_batch_insts, key=lambda inst: len(inst.input.words), reverse=True)
         batch_max_scores, batch_max_ids = model.decode(batch)
-        metrics += eval.evaluate_num(batch_max_ids, batch[-2], batch[1], config.idx2labels)
+        metrics += eval.evaluate_num(sorted_batch_insts, batch_max_ids, batch[-2], batch[1], config.idx2labels)
+        batch_id += 1
     p, total_predict, total_entity = metrics[0], metrics[1], metrics[2]
     precision = p * 1.0 / total_predict * 100 if total_predict != 0 else 0
     recall = p * 1.0 / total_entity * 100 if total_entity != 0 else 0
@@ -189,7 +196,7 @@ def test_model(config: Config, test_insts):
     model.load_state_dict(torch.load(model_name))
     model.eval()
     test_batches = batching_list_instances(config, test_insts)
-    evaluate(config, model, test_batches, "test")
+    evaluate(config, model, test_batches, "test", test_insts)
     write_results(res_name, test_insts)
 
 def write_results(filename:str, insts):
@@ -202,6 +209,7 @@ def write_results(filename:str, insts):
             dep_labels = inst.input.dep_labels
             output = inst.output
             prediction = inst.prediction
+            assert  len(output) == len(prediction)
             f.write("{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(i, words[i], tags[i], heads[i], dep_labels[i], output[i], prediction[i]))
         f.write("\n")
     f.close()
