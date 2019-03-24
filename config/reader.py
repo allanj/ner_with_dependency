@@ -96,7 +96,12 @@ class Reader:
         f = open(file, 'rb')
         all_vecs = pickle.load(f)  # variables come out in the order you put them in
         f.close()
+        size = 0
         for vec, inst in zip(all_vecs, insts):
             inst.elmo_vec = vec
+            size = vec.shape[1]
+            # print(str(vec.shape[0]) + ","+ str(len(inst.input.words)) + ", " + str(inst.input.words))
+            assert(vec.shape[0] == len(inst.input.words))
+        return size
 
 

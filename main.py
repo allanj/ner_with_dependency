@@ -33,7 +33,7 @@ def parse_arguments(parser):
     parser.add_argument('--device', type=str, default="cpu")
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--digit2zero', action="store_true", default=True)
-    parser.add_argument('--dataset', type=str, default="all")
+    parser.add_argument('--dataset', type=str, default="conll2003")
     parser.add_argument('--affix', type=str, default="sd")
     parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
     # parser.add_argument('--embedding_file', type=str, default=None)
@@ -81,7 +81,7 @@ def parse_arguments(parser):
 def get_optimizer(config: Config, model: nn.Module):
     params = model.parameters()
     if config.optimizer.lower() == "sgd":
-        print(colored("Using SGD: lr is: {}, weight decay is: {}".format(config.learning_rate, config.l2), 'yellow'))
+        print(colored("Using SGD: lr is: {}, L2 regularization is: {}".format(config.learning_rate, config.l2), 'yellow'))
         return optim.SGD(params, lr=config.learning_rate, weight_decay=float(config.l2))
     elif config.optimizer.lower() == "adam":
         print(colored("Using Adam", 'yellow'))
@@ -135,8 +135,8 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
         for index in np.random.permutation(len(batched_data)):
         # for index in range(len(batched_data)):
             model.train()
-            batch_word, batch_wordlen, batch_char, batch_charlen, adj_matrixs, dep_label_adj, batch_dep_heads, trees, batch_label, batch_dep_label = batched_data[index]
-            loss = model.neg_log_obj(batch_word, batch_wordlen,batch_char, batch_charlen, adj_matrixs, dep_label_adj, batch_dep_heads, batch_label, batch_dep_label, trees)
+            batch_word, batch_wordlen, batch_context_emb, batch_char, batch_charlen, adj_matrixs, dep_label_adj, batch_dep_heads, trees, batch_label, batch_dep_label = batched_data[index]
+            loss = model.neg_log_obj(batch_word, batch_wordlen, batch_context_emb,batch_char, batch_charlen, adj_matrixs, dep_label_adj, batch_dep_heads, batch_label, batch_dep_label, trees)
             epoch_loss += loss.item()
             loss.backward()
             # # torch.nn.utils.clip_grad_norm_(model.parameters(), config.clip) ##clipping the gradient
@@ -183,8 +183,8 @@ def evaluate(config:Config, model: NNCRF, batch_insts_ids, name:str):
 
 
 def test_model(config: Config, test_insts):
-    model_name = "model_files/lstm_{}_crf_{}_{}_head_{}_elmo_{}.m".format(config.hidden_dim, config.dataset, config.train_num, config.use_head, config.use_elmo)
-    res_name = "results/lstm_{}_crf_{}_{}_head_{}_elmo_{}.results".format(config.hidden_dim, config.dataset, config.train_num, config.use_head, config.use_elmo)
+    model_name = "model_files/lstm_{}_crf_{}_{}_head_{}_elmo_{}.m".format(config.hidden_dim, config.dataset, config.train_num, config.dep_method.name, config.use_elmo)
+    res_name = "results/lstm_{}_crf_{}_{}_head_{}_elmo_{}.results".format(config.hidden_dim, config.dataset, config.train_num, config.dep_method.name, config.use_elmo)
     model = NNCRF(config)
     model.load_state_dict(torch.load(model_name))
     model.eval()
@@ -229,10 +229,9 @@ def main():
 
     if conf.use_elmo:
         print('Loading the elmo vectors for all datasets.')
-        reader.load_elmo_vec(conf.train_file + ".elmo.vec", trains)
-        reader.load_elmo_vec(conf.dev_file + ".elmo.vec", devs)
-        reader.load_elmo_vec(conf.test_file + ".elmo.vec", tests)
-
+        conf.context_emb_size = reader.load_elmo_vec(conf.train_file + ".elmo.average.vec", trains)
+        reader.load_elmo_vec(conf.dev_file + ".elmo.average.vec", devs)
+        reader.load_elmo_vec(conf.test_file + ".elmo.average.vec", tests)
     conf.use_iobes(trains)
     conf.use_iobes(devs)
     conf.use_iobes(tests)

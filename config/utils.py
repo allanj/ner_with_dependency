@@ -47,6 +47,11 @@ def simple_batching(config, insts: List[Instance]):
     char_seq_len = torch.LongTensor([list(map(len, inst.input.words)) + [1] * (int(max_seq_len) - len(inst.input.words)) for inst in batch_data])
     max_char_seq_len = char_seq_len.max()
 
+    word_emb_tensor = None
+    if config.use_elmo:
+        emb_size = insts[0].elmo_vec.shape[1]
+        word_emb_tensor = torch.zeros((batch_size, max_seq_len, emb_size))
+
     word_seq_tensor = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
     label_seq_tensor =  torch.zeros((batch_size, max_seq_len), dtype=torch.long)
     char_seq_tensor = torch.zeros((batch_size, max_seq_len, max_char_seq_len), dtype=torch.long)
@@ -67,6 +72,9 @@ def simple_batching(config, insts: List[Instance]):
     for idx in range(batch_size):
         word_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].word_ids)
         label_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].output_ids)
+        if config.use_elmo:
+            word_emb_tensor[idx, :word_seq_len[idx], :] = torch.from_numpy(batch_data[idx].elmo_vec)
+
         if config.dep_method != DepMethod.none:
             batch_dep_heads[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].dep_head_ids)
             dep_label_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].dep_label_ids)
@@ -80,13 +88,15 @@ def simple_batching(config, insts: List[Instance]):
     char_seq_tensor = char_seq_tensor.to(config.device)
     word_seq_len = word_seq_len.to(config.device)
     char_seq_len = char_seq_len.to(config.device)
+    if config.use_elmo:
+        word_emb_tensor = word_emb_tensor.to(config.device)
     if config.dep_method != DepMethod.none:
         adjs = adjs.to(config.device)
         dep_label_adj = dep_label_adj.to(config.device)
         batch_dep_heads = batch_dep_heads.to(config.device)
         dep_label_tensor = dep_label_tensor.to(config.device)
 
-    return word_seq_tensor, word_seq_len, char_seq_tensor, char_seq_len, adjs, dep_label_adj, batch_dep_heads, trees, label_seq_tensor, dep_label_tensor
+    return word_seq_tensor, word_seq_len, word_emb_tensor, char_seq_tensor, char_seq_len, adjs, dep_label_adj, batch_dep_heads, trees, label_seq_tensor, dep_label_tensor
 
 
 

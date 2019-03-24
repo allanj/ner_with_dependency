@@ -16,6 +16,8 @@ def parse_sentence(elmo, words, mode:str="average"):
         return np.swapaxes(vectors, 0, 1)
     elif mode == 'last':
         return vectors[-1, :, :]
+    elif mode == 'all':
+        return vectors
     else:
         return vectors
 
@@ -38,14 +40,16 @@ def read_parse_write(elmo, infile, outfile, mode):
 
 
 elmo = load_elmo()
-mode= "last"
-file = "./data/conll2003/train.sd.conllx"
+mode= "average"
+dataset="all"
+dep = ""
+file = "../data/"+dataset+"/train"+dep+".conllx"
 outfile = file + ".elmo."+mode+".vec"
 read_parse_write(elmo, file, outfile, mode)
-file = "./data/conll2003/dev.sd.conllx"
+file = "../data/"+dataset+"/dev"+dep+".conllx"
 outfile = file + ".elmo."+mode+".vec"
 read_parse_write(elmo, file, outfile, mode)
-file = "./data/conll2003/test.sd.conllx"
+file = "../data/"+dataset+"/test"+dep+".conllx"
 outfile = file + ".elmo."+mode+".vec"
 read_parse_write(elmo, file, outfile, mode)
 

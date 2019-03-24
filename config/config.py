@@ -49,6 +49,8 @@ class Config:
         # self.device = torch.device("cuda" if args.gpu else "cpu")
         self.embedding_file = args.embedding_file
         self.embedding_dim = args.embedding_dim
+        self.use_elmo = args.use_elmo
+        self.context_emb_size = 0
         self.embedding, self.embedding_dim = self.read_pretrain_embedding()
         self.word_embedding = None
         self.seed = args.seed
@@ -121,7 +123,7 @@ class Config:
 
         self.eval_epoch = args.eval_epoch
 
-        self.use_elmo = args.use_elmo
+
 
 
 
