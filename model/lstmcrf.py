@@ -93,6 +93,8 @@ class NNCRF(nn.Module):
                 final_hidden_dim = config.dep_hidden_dim
             elif self.dep_method == DepMethod.lgcn_lstm:
                 input_size = config.embedding_dim
+                if self.use_context_emb:
+                    input_size += config.context_emb_size
                 if self.use_char:
                     input_size += config.charlstm_hidden_dim
                 self.dep_nn = DepLabeledGCN(config, input_size )  ### first component
@@ -123,7 +125,7 @@ class NNCRF(nn.Module):
 
         word_emb = self.word_embedding(word_seq_tensor)
         if self.use_context_emb:
-            word_emb = torch.cat([word_emb, batch_context_emb], 2)
+            word_emb = torch.cat([word_emb, batch_context_emb.to(self.device)], 2)
         if self.use_char:
             char_features = self.char_feature.get_last_hiddens(char_inputs, char_seq_lens)
             word_emb = torch.cat([word_emb, char_features], 2)

@@ -88,8 +88,8 @@ def simple_batching(config, insts: List[Instance]):
     char_seq_tensor = char_seq_tensor.to(config.device)
     word_seq_len = word_seq_len.to(config.device)
     char_seq_len = char_seq_len.to(config.device)
-    if config.use_elmo:
-        word_emb_tensor = word_emb_tensor.to(config.device)
+    # if config.use_elmo:
+    #     word_emb_tensor = word_emb_tensor.to(config.device)
     if config.dep_method != DepMethod.none:
         adjs = adjs.to(config.device)
         dep_label_adj = dep_label_adj.to(config.device)

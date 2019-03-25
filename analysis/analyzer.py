@@ -26,6 +26,8 @@ def read_conll(res_file: str, number: int = -1) -> List[Instance]:
                 deps = []
                 labels = []
                 tags = []
+                preds = []
+
                 if len(insts) == number:
                     break
                 continue
@@ -39,7 +41,7 @@ def read_conll(res_file: str, number: int = -1) -> List[Instance]:
             pred_label = vals[6]
 
             words.append(word)
-            heads.append(head - 1)  ## because of 0-indexed.
+            heads.append(head)  ## because of 0-indexed.
             deps.append(dep_label)
             tags.append(pos)
             labels.append(label)
@@ -50,18 +52,26 @@ def read_conll(res_file: str, number: int = -1) -> List[Instance]:
 res_file = "../results/lstm_200_crf_conll2003_-1_dep_none_elmo_1_sgd_gate_0.results"
 insts = read_conll(res_file)
 
-
-
+total = 0
+total_word = 0
 for inst in insts:
     gold = inst.output
     prediction = inst.prediction
     words = inst.input.words
     heads = inst.input.heads
     dep_labels = inst.input.dep_labels
+    have_error= False
     for idx in range(len(gold)):
         if gold[idx] != 'O' and prediction[idx] == 'O':
-            print("{}\t{}\t{}\t{}\t{}\t{}\t".format(idx, words[idx], heads[idx], dep_labels[idx], gold[idx], prediction[idx]))
-
-    print()
-
+            have_error = True
+            total_word += 1
+            print("{}\t{}\t{}\t{}\t{}\t{}\t".format(idx, words[idx], heads[idx]+1, dep_labels[idx], gold[idx], prediction[idx]))
+    if have_error:
+        print(words)
+        print(gold)
+        print(prediction)
+        total +=1
+        print()
+print("number of sentences have errors: {}".format(total))
+print("number of words have errors: {}".format(total_word))
 
