@@ -237,9 +237,9 @@ def main():
 
     if conf.use_elmo:
         print('Loading the elmo vectors for all datasets.')
-        conf.context_emb_size = reader.load_elmo_vec(conf.train_file + ".elmo.average.vec", trains)
-        reader.load_elmo_vec(conf.dev_file + ".elmo.average.vec", devs)
-        reader.load_elmo_vec(conf.test_file + ".elmo.average.vec", tests)
+        conf.context_emb_size = reader.load_elmo_vec(conf.train_file.replace(".sd", "").replace(".ud", "").replace(".sud", "") + ".elmo.average.vec", trains)
+        reader.load_elmo_vec(conf.dev_file.replace(".sd", "").replace(".ud", "").replace(".sud", "")  + ".elmo.average.vec", devs)
+        reader.load_elmo_vec(conf.test_file.replace(".sd", "").replace(".ud", "").replace(".sud", "") + ".elmo.average.vec", tests)
     conf.use_iobes(trains)
     conf.use_iobes(devs)
     conf.use_iobes(tests)
