@@ -4,7 +4,7 @@ import random
 import numpy as np
 from config.reader import Reader
 from config import eval
-from config.config import Config
+from config.config import Config, ContextEmb
 import time
 from model.lstmcrf import NNCRF
 import torch
@@ -42,7 +42,7 @@ def parse_arguments(parser):
     parser.add_argument('--learning_rate', type=float, default=0.015) ##only for sgd now
     parser.add_argument('--momentum', type=float, default=0.0)
     parser.add_argument('--l2', type=float, default=1e-8)
-    parser.add_argument('--lr_decay', type=float, default=0.05)
+    parser.add_argument('--lr_decay', type=float, default=0)
     parser.add_argument('--batch_size', type=int, default=10)
     parser.add_argument('--num_epochs', type=int, default=100)
     parser.add_argument('--train_num', type=int, default=-1)
@@ -55,7 +55,7 @@ def parse_arguments(parser):
     parser.add_argument('--hidden_dim', type=int, default=200, help="hidden size of the LSTM")
     parser.add_argument('--dep_emb_size', type=int, default=50, help="embedding size of dependency")
     parser.add_argument('--dep_hidden_dim', type=int, default=200, help="hidden size of gcn, tree lstm")
-    parser.add_argument('--num_gcn_layers', type=int, default=2, help="number of gcn layers")
+    parser.add_argument('--num_gcn_layers', type=int, default=1, help="number of gcn layers")
     parser.add_argument('--gcn_mlp_layers', type=int, default=1, help="number of mlp layers after gcn")
     parser.add_argument('--gcn_dropout', type=float, default=0.5, help="GCN dropout")
     parser.add_argument('--gcn_adj_directed', type=int, default=0, choices=[0, 1], help="GCN ajacent matrix directed")
@@ -67,7 +67,7 @@ def parse_arguments(parser):
     parser.add_argument('--use_char_rnn', type=int, default=1, choices=[0, 1], help="use character-level lstm, 0 or 1")
     # parser.add_argument('--use_head', type=int, default=0, choices=[0, 1], help="not use dependency")
     parser.add_argument('--dep_method',type=str, default="none", help="dependency method")
-    parser.add_argument('--use_elmo', type=int, default=0, choices=[0, 1], help="use Elmo embedding or not")
+    parser.add_argument('--context_emb', type=str, default="none", choices=["none", "bert", "elmo", "flair"], help="contextual word embedding")
 
 
 
@@ -122,8 +122,8 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
     best_dev = [-1, 0]
     best_test = [-1, 0]
 
-    model_name = "model_files/lstm_{}_crf_{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}.m".format(config.hidden_dim, config.dataset, config.train_num, config.dep_method.name, config.use_elmo, config.optimizer.lower(), config.edge_gate, epoch, config.learning_rate)
-    res_name = "results/lstm_{}_crf_{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}.results".format(config.hidden_dim, config.dataset, config.train_num, config.dep_method.name, config.use_elmo, config.optimizer.lower(), config.edge_gate, epoch, config.learning_rate)
+    model_name = "model_files/lstm_{}_crf_{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}.m".format(config.hidden_dim, config.dataset, config.train_num, config.dep_method.name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, epoch, config.learning_rate)
+    res_name = "results/lstm_{}_crf_{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}.results".format(config.hidden_dim, config.dataset, config.train_num, config.dep_method.name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, epoch, config.learning_rate)
     print("[Info] The model will be saved to: %s, please ensure models folder exist" % (model_name))
 
     for i in range(1, epoch + 1):
@@ -190,8 +190,24 @@ def evaluate(config:Config, model: NNCRF, batch_insts_ids, name:str, insts: List
 
 
 def test_model(config: Config, test_insts):
-    model_name = "model_files/lstm_{}_crf_{}_{}_head_{}_elmo_{}.m".format(config.hidden_dim, config.dataset, config.train_num, config.dep_method.name, config.use_elmo)
-    res_name = "results/lstm_{}_crf_{}_{}_head_{}_elmo_{}.results".format(config.hidden_dim, config.dataset, config.train_num, config.dep_method.name, config.use_elmo)
+    model_name = "model_files/lstm_{}_crf_{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}.m".format(config.hidden_dim,
+                                                                                                   config.dataset,
+                                                                                                   config.train_num,
+                                                                                                   config.dep_method.name,
+                                                                                                   config.context_emb.name,
+                                                                                                   config.optimizer.lower(),
+                                                                                                   config.edge_gate,
+                                                                                                   config.num_epochs,
+                                                                                                   config.learning_rate)
+    res_name = "results/lstm_{}_crf_{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}.results".format(config.hidden_dim,
+                                                                                                   config.dataset,
+                                                                                                   config.train_num,
+                                                                                                   config.dep_method.name,
+                                                                                                   config.context_emb.name,
+                                                                                                   config.optimizer.lower(),
+                                                                                                   config.edge_gate,
+                                                                                                   config.num_epochs,
+                                                                                                   config.learning_rate)
     model = NNCRF(config)
     model.load_state_dict(torch.load(model_name))
     model.eval()
@@ -235,11 +251,11 @@ def main():
     # tests = reader.read_txt(conf.test_file, conf.test_num, False)
     # print(trains[-1].input.words)
 
-    if conf.use_elmo:
+    if conf.context_emb != ContextEmb.none:
         print('Loading the elmo vectors for all datasets.')
-        conf.context_emb_size = reader.load_elmo_vec(conf.train_file.replace(".sd", "").replace(".ud", "").replace(".sud", "") + ".elmo.average.vec", trains)
-        reader.load_elmo_vec(conf.dev_file.replace(".sd", "").replace(".ud", "").replace(".sud", "")  + ".elmo.average.vec", devs)
-        reader.load_elmo_vec(conf.test_file.replace(".sd", "").replace(".ud", "").replace(".sud", "") + ".elmo.average.vec", tests)
+        conf.context_emb_size = reader.load_elmo_vec(conf.train_file.replace(".sd", "").replace(".ud", "").replace(".sud", "") + "."+conf.context_emb.name+".vec", trains)
+        reader.load_elmo_vec(conf.dev_file.replace(".sd", "").replace(".ud", "").replace(".sud", "")  + "."+conf.context_emb.name+".vec", devs)
+        reader.load_elmo_vec(conf.test_file.replace(".sd", "").replace(".ud", "").replace(".sud", "") + "."+conf.context_emb.name+".vec", tests)
     conf.use_iobes(trains)
     conf.use_iobes(devs)
     conf.use_iobes(tests)

@@ -26,7 +26,7 @@ def log_sum_exp_pytorch(vec):
 
 
 def simple_batching(config, insts: List[Instance]):
-    from config.config import DepMethod
+    from config.config import DepMethod,ContextEmb
     """
 
     :param config:
@@ -48,7 +48,7 @@ def simple_batching(config, insts: List[Instance]):
     max_char_seq_len = char_seq_len.max()
 
     word_emb_tensor = None
-    if config.use_elmo:
+    if config.context_emb != ContextEmb.none:
         emb_size = insts[0].elmo_vec.shape[1]
         word_emb_tensor = torch.zeros((batch_size, max_seq_len, emb_size))
 
@@ -72,7 +72,7 @@ def simple_batching(config, insts: List[Instance]):
     for idx in range(batch_size):
         word_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].word_ids)
         label_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].output_ids)
-        if config.use_elmo:
+        if config.context_emb != ContextEmb.none:
             word_emb_tensor[idx, :word_seq_len[idx], :] = torch.from_numpy(batch_data[idx].elmo_vec)
 
         if config.dep_method != DepMethod.none:

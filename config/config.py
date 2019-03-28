@@ -25,6 +25,13 @@ class DepMethod(Enum):
     selfattn=9
 
 
+class ContextEmb(Enum):
+    none = 0
+    elmo = 1
+    bert = 2
+    flair = 3
+
+
 
 
 class Config:
@@ -49,7 +56,7 @@ class Config:
         # self.device = torch.device("cuda" if args.gpu else "cpu")
         self.embedding_file = args.embedding_file
         self.embedding_dim = args.embedding_dim
-        self.use_elmo = args.use_elmo
+        self.context_emb = ContextEmb[args.context_emb]
         self.context_emb_size = 0
         self.embedding, self.embedding_dim = self.read_pretrain_embedding()
         self.word_embedding = None

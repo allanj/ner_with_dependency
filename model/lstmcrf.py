@@ -10,8 +10,8 @@ from model.charbilstm import CharBiLSTM
 from model.gcn import GCN
 from model.childsumtreelstm import ChildSumTreeLSTM
 from model.deplabel_gcn import DepLabeledGCN
-from torch.nn.utils.rnn import  pack_padded_sequence, pad_packed_sequence
-from config.config import DepMethod
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+from config.config import DepMethod, ContextEmb
 
 class NNCRF(nn.Module):
 
@@ -23,7 +23,7 @@ class NNCRF(nn.Module):
         self.use_char = config.use_char_rnn
         self.dep_method = config.dep_method
         # self.use_head = config.use_head
-        self.use_context_emb = config.use_elmo
+        self.context_emb = config.context_emb
 
 
 
@@ -36,7 +36,7 @@ class NNCRF(nn.Module):
 
 
         self.input_size = config.embedding_dim
-        if self.use_context_emb:
+        if self.context_emb != ContextEmb.none:
             self.input_size += config.context_emb_size
         if self.use_char:
             self.char_feature = CharBiLSTM(config)
@@ -93,7 +93,7 @@ class NNCRF(nn.Module):
                 final_hidden_dim = config.dep_hidden_dim
             elif self.dep_method == DepMethod.lgcn_lstm:
                 input_size = config.embedding_dim
-                if self.use_context_emb:
+                if self.context_emb != ContextEmb.none:
                     input_size += config.context_emb_size
                 if self.use_char:
                     input_size += config.charlstm_hidden_dim
@@ -124,7 +124,7 @@ class NNCRF(nn.Module):
         sent_len = word_seq_tensor.size(1)
 
         word_emb = self.word_embedding(word_seq_tensor)
-        if self.use_context_emb:
+        if self.context_emb != ContextEmb.none:
             word_emb = torch.cat([word_emb, batch_context_emb.to(self.device)], 2)
         if self.use_char:
             char_features = self.char_feature.get_last_hiddens(char_inputs, char_seq_lens)
