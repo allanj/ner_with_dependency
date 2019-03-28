@@ -37,8 +37,8 @@ def read_parse_write(tokenizer, model, infile, outfile, mode):
 
 def load_bert():
     # Load pre-trained model tokenizer (vocabulary)
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-    model = BertModel.from_pretrained('bert-base-uncased')
+    tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
+    model = BertModel.from_pretrained('bert-base-cased')
     model.eval()
     model.to(device)
     return tokenizer, model
