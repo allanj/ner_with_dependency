@@ -75,7 +75,7 @@ class DepLabeledGCN(nn.Module):
         dep_embs = dep_embs.squeeze(3) * adj_matrix
         #
         self_val = self.dep_emb(self.self_dep_label_id)
-        dep_denom = dep_embs.sum(2).unsqueeze(2) + self_val
+        # dep_denom = dep_embs.sum(2).unsqueeze(2) + self_val
 
         # gcn_biinput = gcn_inputs.view(batch_size, sent_len, 1, input_dim).expand(batch_size, sent_len, sent_len, input_dim) ## B x N x N x h
         # weighted_gcn_input = (dep_embs + gcn_biinput).sum(2)
@@ -85,22 +85,22 @@ class DepLabeledGCN(nn.Module):
             Ax = adj_matrix.bmm(gcn_inputs)  ## N x N  times N x h  = Nxh
             AxW = self.W[l](Ax)   ## N x m
             AxW = AxW + self.W[l](gcn_inputs)  ## self loop  N x h
-            AxW = AxW / denom
 
             Bx = dep_embs.bmm(gcn_inputs)
             BxW = self.W_label[l](Bx)
             BxW = BxW + self.W_label[l](gcn_inputs * self_val)
-            BxW = BxW / dep_denom
+
+            res = (AxW + BxW) / denom
 
             if self.edge_gate:
                 gx = adj_matrix.bmm(gcn_inputs)
                 gxW = self.gates[l](gx)  ## N x m
                 gate_val = torch.sigmoid(gxW + self.gates[l](gcn_inputs))  ## self loop  N x h
-                gAxW = F.relu(gate_val * (AxW + BxW))
+                res = F.relu(gate_val * (res))
             else:
-                gAxW = F.relu(AxW + BxW)
+                res = F.relu(res)
 
-            gcn_inputs = self.gcn_drop(gAxW) if l < self.layers - 1 else gAxW
+            gcn_inputs = self.gcn_drop(res) if l < self.layers - 1 else res
 
 
         outputs = self.out_mlp(gcn_inputs)
