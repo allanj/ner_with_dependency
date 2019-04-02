@@ -264,7 +264,7 @@ def main():
     conf.build_deplabel_idx(trains)
     conf.build_deplabel_idx(devs)
     conf.build_deplabel_idx(tests)
-    print("# deplabels: ", conf.deplabels)
+    print("# deplabels: ", len(conf.deplabels))
     print("dep label 2idx: ", conf.deplabel2idx)
 
     conf.build_trees(trains)
