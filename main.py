@@ -39,7 +39,7 @@ def parse_arguments(parser):
     # parser.add_argument('--embedding_file', type=str, default=None)
     parser.add_argument('--embedding_dim', type=int, default=100)
     parser.add_argument('--optimizer', type=str, default="sgd")
-    parser.add_argument('--learning_rate', type=float, default=0.015) ##only for sgd now
+    parser.add_argument('--learning_rate', type=float, default=0.01) ##only for sgd now
     parser.add_argument('--momentum', type=float, default=0.0)
     parser.add_argument('--l2', type=float, default=1e-8)
     parser.add_argument('--lr_decay', type=float, default=0)
@@ -252,7 +252,7 @@ def main():
     # print(trains[-1].input.words)
 
     if conf.context_emb != ContextEmb.none:
-        print('Loading the elmo vectors for all datasets.')
+        print('Loading the {} vectors for all datasets.'.format(conf.context_emb.name))
         conf.context_emb_size = reader.load_elmo_vec(conf.train_file.replace(".sd", "").replace(".ud", "").replace(".sud", "") + "."+conf.context_emb.name+".vec", trains)
         reader.load_elmo_vec(conf.dev_file.replace(".sd", "").replace(".ud", "").replace(".sud", "")  + "."+conf.context_emb.name+".vec", devs)
         reader.load_elmo_vec(conf.test_file.replace(".sd", "").replace(".ud", "").replace(".sud", "") + "."+conf.context_emb.name+".vec", tests)
