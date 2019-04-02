@@ -42,8 +42,6 @@ class DepLabeledGCN(nn.Module):
             if self.edge_gate:
                 self.gates.append(nn.Linear(input_dim, self.mem_dim).to(self.device))
 
-        self.w_params = nn.Parameter(torch.randn(len(config.deplabels), input_dim, self.mem_dim))
-
         self.dep_emb = nn.Embedding(len(config.deplabels), 1).to(config.device)
 
         # output mlp layers
@@ -60,10 +58,10 @@ class DepLabeledGCN(nn.Module):
 
         """
 
-        :param gcn_inputs: batch_size x sent_len x input_size
-        :param word_seq_len: batch_size x sent_len
-        :param adj_matrix: batch_size x sent_len x sent_len  (0,1)
-        :param dep_label_matrix: batch_size x sent_len x sent_len (with dependency label id)
+        :param gcn_inputs:
+        :param word_seq_len:
+        :param adj_matrix: should already contain the self loop
+        :param dep_label_matrix:
         :return:
         """
 
@@ -71,50 +69,38 @@ class DepLabeledGCN(nn.Module):
 
         denom = adj_matrix.sum(2).unsqueeze(2) + 1
 
+        ##dep_label_matrix: NxN
+        ##dep_emb.
         dep_embs = self.dep_emb(dep_label_matrix)  ## B x N x N x 1
         dep_embs = dep_embs.squeeze(3) * adj_matrix
         #
         self_val = self.dep_emb(self.self_dep_label_id)
         dep_denom = dep_embs.sum(2).unsqueeze(2) + self_val
 
-
+        # gcn_biinput = gcn_inputs.view(batch_size, sent_len, 1, input_dim).expand(batch_size, sent_len, sent_len, input_dim) ## B x N x N x h
+        # weighted_gcn_input = (dep_embs + gcn_biinput).sum(2)
 
         for l in range(self.layers):
-            gcn_biinput = gcn_inputs.view(batch_size, 1, sent_len, input_dim).expand(batch_size, sent_len, sent_len, input_dim)  ## B x N x N x input_size
-            adj_h_mat = gcn_biinput * adj_matrix.view(batch_size, sent_len, sent_len, 1)  ## B x N x N x input_size
 
-            adj_w_mat = torch.gather(self.w_params, 0, dep_label_matrix.view(-1, 1, 1).expand(self.mem_dim, input_dim))
-            # adj_w_mat = adj_w_mat.view(batch_size, sent_len, sent_len, self.mem_dim, input_dim)
+            Ax = adj_matrix.bmm(gcn_inputs)  ## N x N  times N x h  = Nxh
+            AxW = self.W[l](Ax)   ## N x m
+            AxW = AxW + self.W[l](gcn_inputs)  ## self loop  N x h
+            AxW = AxW / denom
 
-            weighted_gcn_input = adj_w_mat.bmm(adj_h_mat.view(-1, input_dim, 1))
-            weighted_gcn_input = weighted_gcn_input.view(batch_size, sent_len, sent_len, self.mem_dim).sum(2)  ## B x N x h
-            weighted_gcn_input = weighted_gcn_input / denom
-            gcn_inputs = F.relu(weighted_gcn_input)
+            Bx = dep_embs.bmm(gcn_inputs)
+            BxW = self.W_label[l](Bx)
+            BxW = BxW + self.W_label[l](gcn_inputs * self_val)
+            BxW = BxW / dep_denom
 
-            input_dim = self.mem_dim
-            gcn_inputs = self.gcn_drop(gcn_inputs) if l < self.layers - 1 else gcn_inputs
+            if self.edge_gate:
+                gx = adj_matrix.bmm(gcn_inputs)
+                gxW = self.gates[l](gx)  ## N x m
+                gate_val = torch.sigmoid(gxW + self.gates[l](gcn_inputs))  ## self loop  N x h
+                gAxW = F.relu(gate_val * (AxW + BxW))
+            else:
+                gAxW = F.relu(AxW + BxW)
 
-        # for l in range(self.layers):
-        #
-        #     Ax = adj_matrix.bmm(gcn_inputs)  ## N x N  times N x h  = Nxh
-        #     AxW = self.W[l](Ax)   ## N x m
-        #     AxW = AxW + self.W[l](gcn_inputs)  ## self loop  N x h
-        #     AxW = AxW / denom
-        #
-        #     Bx = dep_embs.bmm(gcn_inputs)
-        #     BxW = self.W_label[l](Bx)
-        #     BxW = BxW + self.W_label[l](gcn_inputs * self_val)
-        #     BxW = BxW / dep_denom
-        #
-        #     if self.edge_gate:
-        #         gx = adj_matrix.bmm(gcn_inputs)
-        #         gxW = self.gates[l](gx)  ## N x m
-        #         gate_val = torch.sigmoid(gxW + self.gates[l](gcn_inputs))  ## self loop  N x h
-        #         gAxW = F.relu(gate_val * (AxW + BxW))
-        #     else:
-        #         gAxW = F.relu(AxW + BxW)
-        #
-        #     gcn_inputs = self.gcn_drop(gAxW) if l < self.layers - 1 else gAxW
+            gcn_inputs = self.gcn_drop(gAxW) if l < self.layers - 1 else gAxW
 
 
         outputs = self.out_mlp(gcn_inputs)
