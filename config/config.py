@@ -23,6 +23,7 @@ class DepMethod(Enum):
     lstm_lgcn = 7  ## LSTM to a gcn with dependency labeled
     lgcn_lstm = 8
     selfattn=9
+    lstm_sgcn=10
 
 
 class ContextEmb(Enum):

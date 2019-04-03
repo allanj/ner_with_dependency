@@ -56,16 +56,26 @@ def simple_batching(config, insts: List[Instance]):
     label_seq_tensor =  torch.zeros((batch_size, max_seq_len), dtype=torch.long)
     char_seq_tensor = torch.zeros((batch_size, max_seq_len, max_char_seq_len), dtype=torch.long)
     adjs = None
+    adjs_in = None
+    adjs_out = None
     dep_label_adj = None
     dep_label_tensor = None
     batch_dep_heads = None
     trees = None
     if config.dep_method != DepMethod.none:
         adjs = [ head_to_adj(max_seq_len, inst, config) for inst in batch_data]
-        dep_label_adj = [ head_to_adj_label(max_seq_len, inst, config) for inst in batch_data]
         adjs = np.stack(adjs, axis=0)
         adjs = torch.from_numpy(adjs)
+        dep_label_adj = [head_to_adj_label(max_seq_len, inst, config) for inst in batch_data]
         dep_label_adj = torch.from_numpy(np.stack(dep_label_adj, axis=0)).long()
+
+        adjs_in = [head_to_adj_directed(max_seq_len, inst, "in") for inst in batch_data]
+        adjs_in = np.stack(adjs_in, axis=0)
+        adjs_in = torch.from_numpy(adjs_in)
+        adjs_out = [head_to_adj_directed(max_seq_len, inst, "out") for inst in batch_data]
+        adjs_out = np.stack(adjs_out, axis=0)
+        adjs_out = torch.from_numpy(adjs_out)
+
         batch_dep_heads = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
         dep_label_tensor = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
         trees = [inst.tree for inst in batch_data]
@@ -92,11 +102,13 @@ def simple_batching(config, insts: List[Instance]):
     #     word_emb_tensor = word_emb_tensor.to(config.device)
     if config.dep_method != DepMethod.none:
         adjs = adjs.to(config.device)
+        adjs_in = adjs_in.to(config.device)
+        adjs_out = adjs_out.to(config.device)
         dep_label_adj = dep_label_adj.to(config.device)
         batch_dep_heads = batch_dep_heads.to(config.device)
         dep_label_tensor = dep_label_tensor.to(config.device)
 
-    return word_seq_tensor, word_seq_len, word_emb_tensor, char_seq_tensor, char_seq_len, adjs, dep_label_adj, batch_dep_heads, trees, label_seq_tensor, dep_label_tensor
+    return word_seq_tensor, word_seq_len, word_emb_tensor, char_seq_tensor, char_seq_len, adjs, adjs_in, adjs_out, dep_label_adj, batch_dep_heads, trees, label_seq_tensor, dep_label_tensor
 
 
 
@@ -128,6 +140,23 @@ def head_to_adj(max_len, inst, config):
     if self_loop:
         for i in range(len(inst.input.words)):
             ret[i, i] = 1
+
+    return ret
+
+
+def head_to_adj_directed(max_len, inst, direction):
+    """
+    Convert a tree object to an (numpy) adjacency matrix.
+    """
+    ret = np.zeros((max_len, max_len), dtype=np.float32)
+
+    for i, head in enumerate(inst.input.heads):
+        if head == -1:
+            continue
+        if direction == "in":
+            ret[i, head] = 1
+        else:
+            ret[head, i] = 1
 
     return ret
 

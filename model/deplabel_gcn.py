@@ -90,7 +90,7 @@ class DepLabeledGCN(nn.Module):
             BxW = self.W_label[l](Bx)
             BxW = BxW + self.W_label[l](gcn_inputs * self_val)
 
-            res = (AxW + BxW) / denom
+            res = (AxW + BxW) / denom   ## B x N x hidden_size
 
             if self.edge_gate:
                 gx = adj_matrix.bmm(gcn_inputs)
