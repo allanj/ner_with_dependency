@@ -37,6 +37,11 @@ class SyntacticGCN(nn.Module):
         if self.edge_gate:
             print("[Info] Labeled GCN model will be added edge-wise gating.")
             self.gates = nn.ModuleList()
+            self.g_in = nn.ModuleList()
+            self.g_out = nn.ModuleList()
+            self.g_self = nn.ModuleList()
+
+            self.gbiases = nn.ModuleList()
 
         for layer in range(self.layers):
             input_dim = self.in_dim if layer == 0 else self.mem_dim
@@ -44,6 +49,11 @@ class SyntacticGCN(nn.Module):
             self.W_out.append(nn.Linear(input_dim, self.mem_dim).to(self.device))
             self.W_self.append(nn.Linear(input_dim, self.mem_dim).to(self.device))
             self.biases.append(nn.Embedding(len(config.deplabels), self.mem_dim).to(config.device))
+            if self.edge_gate:
+                self.g_in.append(nn.Linear(input_dim, self.mem_dim).to(self.device))
+                self.g_out.append(nn.Linear(input_dim, self.mem_dim).to(self.device))
+                self.g_self.append(nn.Linear(input_dim, self.mem_dim).to(self.device))
+                self.gbiases.append(nn.Embedding(len(config.deplabels), self.mem_dim).to(config.device))
 
 
 
@@ -79,7 +89,6 @@ class SyntacticGCN(nn.Module):
 
             Ax = adj_matrix_in.bmm(gcn_inputs)  ## N x N  times N x h  = Nxh
             AxW = self.W_in[l](Ax)   ## N x m
-            AxW = AxW #+ self.W[l](gcn_inputs)  ## self loop  N x h
 
             Bx = adj_matrix_out.bmm(gcn_inputs)
             BxW = self.W_out[l](Bx)
@@ -95,7 +104,27 @@ class SyntacticGCN(nn.Module):
 
             res += total_bias
 
-            res = F.relu(res)
+            if self.edge_gate:
+                gAxW = self.g_in[l](Ax)  ## N x m
+
+                gBxW = self.g_out[l](Bx)
+
+                gself_out = self.g_self[l](gcn_inputs)
+
+                gres = (gAxW + gBxW + gself_out) / denom
+
+                gdep_embs = self.gbiases[l](dep_label_matrix)  ## B x N x N x hidden_size.
+                ## masking step.
+                gtotal_bias = (gdep_embs * adj_matrix_in.unsqueeze(3)).sum(1) + (
+                        gdep_embs * adj_matrix_out.unsqueeze(3)).sum(2)
+
+                gres += gtotal_bias
+
+                gres = torch.sigmoid(gres)
+
+                res = F.relu(gres * res)
+            else:
+                res = F.relu(res)
 
             gcn_inputs = self.gcn_drop(res) if l < self.layers - 1 else res
 
