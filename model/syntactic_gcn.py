@@ -80,7 +80,7 @@ class SyntacticGCN(nn.Module):
 
         batch_size, sent_len, input_dim = gcn_inputs.size()
 
-        denom = adj_matrix_in.sum(2).unsqueeze(2) + adj_matrix_out.sum(2).unsqueeze(2) + 1
+        # denom = adj_matrix_in.sum(2).unsqueeze(2) + adj_matrix_out.sum(2).unsqueeze(2) + 1
 
         ##dep_label_matrix: NxN
         ##dep_emb.
@@ -96,7 +96,7 @@ class SyntacticGCN(nn.Module):
             self_out = self.W_self[l](gcn_inputs)
 
 
-            res = (AxW + BxW + self_out) / denom
+            res = (AxW + BxW + self_out) #/ denom
 
             dep_embs = self.biases[l](dep_label_matrix)  ## B x N x N x hidden_size.
             ## masking step.
@@ -111,7 +111,7 @@ class SyntacticGCN(nn.Module):
 
                 gself_out = self.g_self[l](gcn_inputs)
 
-                gres = (gAxW + gBxW + gself_out) / denom
+                gres = (gAxW + gBxW + gself_out) #/ denom
 
                 gdep_embs = self.gbiases[l](dep_label_matrix)  ## B x N x N x hidden_size.
                 ## masking step.

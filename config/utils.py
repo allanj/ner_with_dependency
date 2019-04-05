@@ -63,18 +63,19 @@ def simple_batching(config, insts: List[Instance]):
     batch_dep_heads = None
     trees = None
     if config.dep_method != DepMethod.none:
-        adjs = [ head_to_adj(max_seq_len, inst, config) for inst in batch_data]
-        adjs = np.stack(adjs, axis=0)
-        adjs = torch.from_numpy(adjs)
-        dep_label_adj = [head_to_adj_label(max_seq_len, inst, config) for inst in batch_data]
-        dep_label_adj = torch.from_numpy(np.stack(dep_label_adj, axis=0)).long()
+        if "gcn" in config.dep_method.name:
+            adjs = [ head_to_adj(max_seq_len, inst, config) for inst in batch_data]
+            adjs = np.stack(adjs, axis=0)
+            adjs = torch.from_numpy(adjs)
+            dep_label_adj = [head_to_adj_label(max_seq_len, inst, config) for inst in batch_data]
+            dep_label_adj = torch.from_numpy(np.stack(dep_label_adj, axis=0)).long()
 
-        adjs_in = [head_to_adj_directed(max_seq_len, inst, "in") for inst in batch_data]
-        adjs_in = np.stack(adjs_in, axis=0)
-        adjs_in = torch.from_numpy(adjs_in)
-        adjs_out = [head_to_adj_directed(max_seq_len, inst, "out") for inst in batch_data]
-        adjs_out = np.stack(adjs_out, axis=0)
-        adjs_out = torch.from_numpy(adjs_out)
+            adjs_in = [head_to_adj_directed(max_seq_len, inst, "in") for inst in batch_data]
+            adjs_in = np.stack(adjs_in, axis=0)
+            adjs_in = torch.from_numpy(adjs_in)
+            adjs_out = [head_to_adj_directed(max_seq_len, inst, "out") for inst in batch_data]
+            adjs_out = np.stack(adjs_out, axis=0)
+            adjs_out = torch.from_numpy(adjs_out)
 
         batch_dep_heads = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
         dep_label_tensor = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
@@ -101,9 +102,10 @@ def simple_batching(config, insts: List[Instance]):
     # if config.use_elmo:
     #     word_emb_tensor = word_emb_tensor.to(config.device)
     if config.dep_method != DepMethod.none:
-        adjs = adjs.to(config.device)
-        adjs_in = adjs_in.to(config.device)
-        adjs_out = adjs_out.to(config.device)
+        if "gcn" in config.dep_method.name:
+            adjs = adjs.to(config.device)
+            adjs_in = adjs_in.to(config.device)
+            adjs_out = adjs_out.to(config.device)
         dep_label_adj = dep_label_adj.to(config.device)
         batch_dep_heads = batch_dep_heads.to(config.device)
         dep_label_tensor = dep_label_tensor.to(config.device)
