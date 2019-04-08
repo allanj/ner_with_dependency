@@ -155,12 +155,15 @@ class Config:
                 if len(line) == 0:
                     continue
                 tokens = line.split()
+                if len(tokens) == 2:
+                    continue
                 if embedding_dim < 0:
                     embedding_dim = len(tokens) - 1
                 else:
                     # print(tokens)
                     # print(embedding_dim)
-                    assert (embedding_dim + 1 == len(tokens))
+                    # assert (embedding_dim + 1 == len(tokens))
+                    pass
                 embedd = np.empty([1, embedding_dim])
                 embedd[:] = tokens[1:]
                 first_col = tokens[0]

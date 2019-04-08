@@ -23,7 +23,7 @@ class CharBiLSTM(nn.Module):
         # self.char_embeddings.weight.data.copy_(torch.from_numpy(self.random_embedding(self.char_size, self.char_emb_size)))
         self.char_embeddings = self.char_embeddings.to(self.device)
 
-        self.char_lstm = nn.LSTM(self.char_emb_size, self.hidden//2 ,num_layers=1, batch_first=True, bidirectional=True).to(self.device)
+        self.char_lstm = nn.LSTM(self.char_emb_size, self.hidden ,num_layers=1, batch_first=True, bidirectional=False).to(self.device)
 
 
     # def random_embedding(self, vocab_size, embedding_dim):
