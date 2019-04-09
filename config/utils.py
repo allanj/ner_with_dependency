@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from typing import List
 from common.instance import Instance
+import dgl
 
 
 START = "<START>"
@@ -62,6 +63,7 @@ def simple_batching(config, insts: List[Instance]):
     dep_label_tensor = None
     batch_dep_heads = None
     trees = None
+    graphs = None
     if config.dep_method != DepMethod.none:
         if "gcn" in config.dep_method.name:
             adjs = [ head_to_adj(max_seq_len, inst, config) for inst in batch_data]
@@ -76,6 +78,20 @@ def simple_batching(config, insts: List[Instance]):
             adjs_out = [head_to_adj_directed(max_seq_len, inst, "out") for inst in batch_data]
             adjs_out = np.stack(adjs_out, axis=0)
             adjs_out = torch.from_numpy(adjs_out)
+
+            graphs = []
+            for inst in batch_data:
+                g = dgl.DGLGraph()
+                g.add_nodes(max_seq_len.item())
+                if len(inst.input.heads) > 1:
+                    edge_list = [(head, i)  for i, head in enumerate(inst.input.heads) if head != -1 ]
+                    src, dst = tuple(zip(*edge_list))
+                    g.add_edges(src, dst)
+                edge_types = [inst.dep_label_ids[i] for i, head in enumerate(inst.input.heads) if head != -1]
+                edge_type = torch.from_numpy(np.asarray(edge_types, dtype=np.int))
+                g.edata.update({'rel_type': edge_type})
+                # g.add_edges(dst, src) # edges are directional in DGL; make them bi-directional
+                graphs.append(g)
 
         batch_dep_heads = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
         dep_label_tensor = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
@@ -106,11 +122,12 @@ def simple_batching(config, insts: List[Instance]):
             adjs = adjs.to(config.device)
             adjs_in = adjs_in.to(config.device)
             adjs_out = adjs_out.to(config.device)
+            graphs = dgl.batch(graphs)
             dep_label_adj = dep_label_adj.to(config.device)
         batch_dep_heads = batch_dep_heads.to(config.device)
         dep_label_tensor = dep_label_tensor.to(config.device)
 
-    return word_seq_tensor, word_seq_len, word_emb_tensor, char_seq_tensor, char_seq_len, adjs, adjs_in, adjs_out, dep_label_adj, batch_dep_heads, trees, label_seq_tensor, dep_label_tensor
+    return word_seq_tensor, word_seq_len, word_emb_tensor, char_seq_tensor, char_seq_len, adjs, adjs_in, adjs_out, graphs, dep_label_adj, batch_dep_heads, trees, label_seq_tensor, dep_label_tensor
 
 
 

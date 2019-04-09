@@ -24,6 +24,7 @@ class DepMethod(Enum):
     lgcn_lstm = 8
     selfattn=9
     lstm_sgcn=10
+    lstm_rgcn=11
 
 
 class ContextEmb(Enum):
