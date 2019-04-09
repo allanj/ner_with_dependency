@@ -119,7 +119,40 @@ def process_conll2003(filename:str, out:str):
     fres.close()
 
 
-def spacy_process(words, tags=None):
+def process_wnut(model, filename:str, out:str):
+    fres = open(out, 'w', encoding='utf-8')
+    print(filename)
+    line_idx = 1
+    with open(filename, 'r', encoding='utf-8') as f:
+        words = []
+        labels = []
+        for line in f.readlines():
+            line = line.rstrip()
+            if line == "":
+                heads, deps, tags = spacy_process(model, words)
+                idx = 1
+                for w, tag, h, dep, label in zip(words, tags, heads, deps, labels):
+                    if dep == "ROOT":
+                        dep = "root"
+                    fres.write("{}\t{}\t_\t_\t_\t_\t{}\t{}\t_\t_\t{}\n".format(idx, w, h, dep, label))
+                    idx += 1
+                fres.write('\n')
+                words = []
+                labels = []
+                line_idx += 1
+                continue
+            #1	West	_	NNP	NNP	_	5	compound	_	_	B-MISC
+            try:
+                word, label = line.split()
+            except:
+                print(line_idx)
+            line_idx += 1
+            words.append(word)
+            labels.append(label)
+    fres.close()
+
+
+def spacy_process(nlp, words, tags=None):
     spaces = [False] * len(words)
     spaces[0] = True
     doc = Doc(nlp.vocab, words=words, spaces=spaces)
@@ -152,21 +185,27 @@ def spacy_process(words, tags=None):
 # process_conll2003("../data/conll2003/test.sd.conllx", "../data/conll2003/test.sud.conllx")
 
 
-nlp = spacy.load('es_core_news_md', disable=['ner'])
+# nlp = spacy.load('es_core_news_md', disable=['ner'])
+#
+# process_conll2002("../data/conll2002/train.txt", "../data/conll2002/train.ud.conllx")
+# process_conll2002("../data/conll2002/dev.txt", "../data/conll2002/dev.ud.conllx")
+# process_conll2002("../data/conll2002/test.txt", "../data/conll2002/test.ud.conllx")
+#
+# nlp = spacy.load('nl_core_news_sm', disable=['tagger','ner'])
+#
+# process_dutch("../data/dutch/train.txt", "../data/dutch/train.ud.conllx")
+# process_dutch("../data/dutch/dev.txt", "../data/dutch/dev.ud.conllx")
+# process_dutch("../data/dutch/test.txt", "../data/dutch/test.ud.conllx")
+#
+#
+# nlp = spacy.load('de_core_news_md', disable=['ner'])
+#
+# process_german("../data/german/train.txt", "../data/german/train.ud.conllx")
+# process_german("../data/german/dev.txt", "../data/german/dev.ud.conllx")
+# process_german("../data/german/test.txt", "../data/german/test.ud.conllx")
 
-process_conll2002("../data/conll2002/train.txt", "../data/conll2002/train.ud.conllx")
-process_conll2002("../data/conll2002/dev.txt", "../data/conll2002/dev.ud.conllx")
-process_conll2002("../data/conll2002/test.txt", "../data/conll2002/test.ud.conllx")
 
-nlp = spacy.load('nl_core_news_sm', disable=['tagger','ner'])
-
-process_dutch("../data/dutch/train.txt", "../data/dutch/train.ud.conllx")
-process_dutch("../data/dutch/dev.txt", "../data/dutch/dev.ud.conllx")
-process_dutch("../data/dutch/test.txt", "../data/dutch/test.ud.conllx")
-
-
-nlp = spacy.load('de_core_news_md', disable=['ner'])
-
-process_german("../data/german/train.txt", "../data/german/train.ud.conllx")
-process_german("../data/german/dev.txt", "../data/german/dev.ud.conllx")
-process_german("../data/german/test.txt", "../data/german/test.ud.conllx")
+# model = spacy.load('en_core_web_lg', disable=['ner'])
+# process_wnut(model, "../data/wnut17/wnut17train.conll", "../data/wnut17/train.ud.conllx")
+# process_wnut(model, "../data/wnut17/emerging.dev.conll", "../data/wnut17/dev.ud.conllx")
+# process_wnut(model, "../data/wnut17/emerging.test.annotated", "../data/wnut17/test.ud.conllx")

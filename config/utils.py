@@ -106,7 +106,7 @@ def simple_batching(config, insts: List[Instance]):
             adjs = adjs.to(config.device)
             adjs_in = adjs_in.to(config.device)
             adjs_out = adjs_out.to(config.device)
-        dep_label_adj = dep_label_adj.to(config.device)
+            dep_label_adj = dep_label_adj.to(config.device)
         batch_dep_heads = batch_dep_heads.to(config.device)
         dep_label_tensor = dep_label_tensor.to(config.device)
 
