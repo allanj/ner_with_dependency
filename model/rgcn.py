@@ -51,19 +51,13 @@ class RGCNLayer(nn.Module):
         else:
             weight = self.weight
 
-        if self.is_input_layer:
-            def message_func(edges):
-                # for input layer, matrix multiply can be converted to be
-                # an embedding lookup using source node id
-                embed = weight.view(-1, self.out_feat)
-                index = edges.data['rel_type'] * self.in_feat + edges.src['id']
-                return {'msg': embed[index] * edges.data['norm']}
-        else:
-            def message_func(edges):
-                w = weight[edges.data['rel_type']]
-                msg = torch.bmm(edges.src['h'].unsqueeze(1), w).squeeze()
-                msg = msg * edges.data['norm']
-                return {'msg': msg}
+
+        def message_func(edges):
+            hidden = edges.src['id'] if self.is_input_layer else edges.src['h']
+            w = weight[edges.data['rel_type'].long()]
+            msg = torch.bmm(hidden.unsqueeze(1), w).squeeze()
+            # msg = msg * edges.data['norm']
+            return {'msg': msg}
 
         def apply_func(nodes):
             h = nodes.data['h']
@@ -77,16 +71,13 @@ class RGCNLayer(nn.Module):
 
 
 class DepRGCN(nn.Module):
-    def __init__(self, num_nodes, input_dim, h_dim, out_dim, num_rels,
-                 num_bases=-1, num_hidden_layers=1):
+    def __init__(self, config, input_dim):
         super(DepRGCN, self).__init__()
-        self.num_nodes = num_nodes
         self.input_dim = input_dim
-        self.h_dim = h_dim
-        self.out_dim = out_dim
-        self.num_rels = num_rels
-        self.num_bases = num_bases
-        self.num_hidden_layers = num_hidden_layers
+        self.h_dim = config.dep_hidden_dim
+        self.num_rels = len(config.deplabels)
+        self.num_bases = len(config.deplabels)
+        self.num_hidden_layers = config.num_gcn_layers
 
         # create rgcn layers
         self.build_model()
@@ -94,33 +85,29 @@ class DepRGCN(nn.Module):
 
     def build_model(self):
         self.layers = nn.ModuleList()
-        # input to hidden
-        i2h = self.build_input_layer()
+        # # input to hidden
+        i2h = self.build_hidden_layer(True)
         self.layers.append(i2h)
         # hidden to hidden
-        for _ in range(self.num_hidden_layers):
-            h2h = self.build_hidden_layer()
+        for _ in range(self.num_hidden_layers - 1):
+            h2h = self.build_hidden_layer(False)
             self.layers.append(h2h)
         # hidden to output
 
 
-    def build_input_layer(self):
-        return RGCNLayer(self.input_dim, self.h_dim, self.num_rels, self.num_bases,
-                         activation=F.relu, is_input_layer=True)
-
-    def build_hidden_layer(self):
+    def build_hidden_layer(self, is_input_layer):
         return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases,
-                         activation=F.relu)
+                         activation=F.relu, is_input_layer=is_input_layer)
 
-    def forward(self, g, feats): ##is a batched graph.
+    def forward(self, feats, g): ##is a batched graph.
         """
 
         :param g: a batched graph
-        :param feats: batch_size * sent_len x input_size
+        :param feats: batch_size x sent_len x input_size
         :return:
         """
-        batch_size, sent_len, self.input_dim = self.features.size()
-        g.ndata['id'] = self.features.view(-1, self.input_dim)
+        batch_size, sent_len, self.input_dim = feats.size()
+        g.ndata['id'] = feats.contiguous().view(-1, self.input_dim)
         for layer in self.layers:
             layer(g)
         output = g.ndata.pop('h').view(batch_size, sent_len, -1)

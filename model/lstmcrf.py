@@ -11,6 +11,7 @@ from model.gcn import GCN
 from model.childsumtreelstm import ChildSumTreeLSTM
 from model.deplabel_gcn import DepLabeledGCN
 from model.syntactic_gcn import SyntacticGCN
+from model.rgcn import DepRGCN
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from config.config import DepMethod, ContextEmb
 
@@ -95,6 +96,9 @@ class NNCRF(nn.Module):
             elif self.dep_method == DepMethod.lstm_sgcn:
                 self.dep_nn = SyntacticGCN(config, config.hidden_dim)  ### lstm hidden size
                 final_hidden_dim = config.dep_hidden_dim
+            elif self.dep_method == DepMethod.lstm_rgcn:
+                self.dep_nn = DepRGCN(config, config.hidden_dim)  ### lstm hidden size
+                final_hidden_dim = config.dep_hidden_dim
 
             elif self.dep_method == DepMethod.lgcn_lstm:
                 input_size = config.embedding_dim
@@ -116,7 +120,7 @@ class NNCRF(nn.Module):
         self.transition = nn.Parameter(init_transition)
 
 
-    def neural_scoring(self, word_seq_tensor, word_seq_lens, batch_context_emb, char_inputs, char_seq_lens, adj_matrixs, adjs_in, adjs_out, dep_label_adj, dep_head_tensor, dep_label_tensor, trees=None):
+    def neural_scoring(self, word_seq_tensor, word_seq_lens, batch_context_emb, char_inputs, char_seq_lens, adj_matrixs, adjs_in, adjs_out, graphs, dep_label_adj, dep_head_tensor, dep_label_tensor, trees=None):
         """
         :param word_seq_tensor: (batch_size, sent_len)   NOTE: The word seq actually is already ordered before come here.
         :param word_seq_lens: (batch_size, 1)
@@ -184,6 +188,9 @@ class NNCRF(nn.Module):
             feature_out = self.dep_nn(feature_out, sorted_seq_len, adj_matrixs[permIdx], dep_label_adj[permIdx])
         elif self.dep_method == DepMethod.lstm_sgcn:
             feature_out = self.dep_nn(feature_out, sorted_seq_len, adjs_in[permIdx], adjs_out[permIdx], dep_label_adj[permIdx])
+        elif self.dep_method == DepMethod.lstm_rgcn:
+            feature_out = self.dep_nn(feature_out, graphs)
+
         elif self.dep_method == DepMethod.lstm_label_gcn:
             dep_emb = self.dep_label_embedding(dep_label_tensor)[permIdx]
             gcn_input = torch.cat([feature_out, dep_emb], 2)
@@ -247,8 +254,8 @@ class NNCRF(nn.Module):
 
 
 
-    def neg_log_obj(self, words, word_seq_lens, batch_context_emb, chars, char_seq_lens, adj_matrixs, adjs_in, adjs_out, dep_label_adj, batch_dep_heads, tags, batch_dep_label, trees=None):
-        features = self.neural_scoring(words, word_seq_lens, batch_context_emb, chars, char_seq_lens, adj_matrixs, adjs_in, adjs_out, dep_label_adj, batch_dep_heads, batch_dep_label, trees)
+    def neg_log_obj(self, words, word_seq_lens, batch_context_emb, chars, char_seq_lens, adj_matrixs, adjs_in, adjs_out, graphs, dep_label_adj, batch_dep_heads, tags, batch_dep_label, trees=None):
+        features = self.neural_scoring(words, word_seq_lens, batch_context_emb, chars, char_seq_lens, adj_matrixs, adjs_in, adjs_out, graphs, dep_label_adj, batch_dep_heads, batch_dep_label, trees)
 
         all_scores = self.calculate_all_scores(features)
 
@@ -296,8 +303,8 @@ class NNCRF(nn.Module):
         return bestScores, decodeIdx
 
     def decode(self, batchInput):
-        wordSeqTensor, wordSeqLengths, batch_context_emb, charSeqTensor, charSeqLengths, adj_matrixs, adjs_in, adjs_out, dep_label_adj, batch_dep_heads, trees, tagSeqTensor, batch_dep_label = batchInput
-        features = self.neural_scoring(wordSeqTensor, wordSeqLengths, batch_context_emb,charSeqTensor,charSeqLengths, adj_matrixs, adjs_in, adjs_out, dep_label_adj, batch_dep_heads, batch_dep_label, trees)
+        wordSeqTensor, wordSeqLengths, batch_context_emb, charSeqTensor, charSeqLengths, adj_matrixs, adjs_in, adjs_out, graphs, dep_label_adj, batch_dep_heads, trees, tagSeqTensor, batch_dep_label = batchInput
+        features = self.neural_scoring(wordSeqTensor, wordSeqLengths, batch_context_emb,charSeqTensor,charSeqLengths, adj_matrixs, adjs_in, adjs_out, graphs, dep_label_adj, batch_dep_heads, batch_dep_label, trees)
         all_scores = self.calculate_all_scores(features)
         bestScores, decodeIdx = self.viterbiDecode(all_scores, wordSeqLengths)
         return bestScores, decodeIdx
