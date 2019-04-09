@@ -27,12 +27,65 @@ def process_conll2002(filename:str, out:str):
                     idx += 1
                 fres.write('\n')
                 words = []
-                tags = []
                 labels = []
                 continue
             word, label = line.split()
             words.append(word)
             labels.append(label)
+    fres.close()
+
+
+def process_german(filename:str, out:str):
+    fres = open(out, 'w', encoding='utf-8')
+    print(filename)
+    with open(filename, 'r', encoding='utf-8') as f:
+        words = []
+        labels = []
+        for line in f.readlines():
+            line = line.rstrip()
+            if line == "":
+                heads, deps, tags = spacy_process(words)
+                idx = 1
+                for w, tag, h, dep, label in zip(words, tags, heads, deps, labels):
+                    if dep == "ROOT":
+                        dep = "root"
+                    fres.write("{}\t{}\t_\t_\t_\t_\t{}\t{}\t_\t_\t{}\n".format(idx, w, h, dep, label))
+                    idx += 1
+                fres.write('\n')
+                words = []
+                labels = []
+                continue
+            word, _, label = line.split()
+            words.append(word)
+            labels.append(label)
+    fres.close()
+
+def process_dutch(filename:str, out:str):
+    fres = open(out, 'w', encoding='utf-8')
+    print(filename)
+    with open(filename, 'r', encoding='utf-8') as f:
+        words = []
+        labels = []
+        tags= []
+        for line in f.readlines():
+            line = line.rstrip()
+            if line == "":
+                heads, deps = spacy_process(words, tags)
+                idx = 1
+                for w, tag, h, dep, label in zip(words, tags, heads, deps, labels):
+                    if dep == "ROOT":
+                        dep = "root"
+                    fres.write("{}\t{}\t_\t_\t_\t_\t{}\t{}\t_\t_\t{}\n".format(idx, w, h, dep, label))
+                    idx += 1
+                fres.write('\n')
+                words = []
+                tags= []
+                labels = []
+                continue
+            word, tag, label = line.split()
+            words.append(word)
+            labels.append(label)
+            tags.append(tag)
     fres.close()
 
 
@@ -104,3 +157,16 @@ nlp = spacy.load('es_core_news_md', disable=['ner'])
 process_conll2002("../data/conll2002/train.txt", "../data/conll2002/train.ud.conllx")
 process_conll2002("../data/conll2002/dev.txt", "../data/conll2002/dev.ud.conllx")
 process_conll2002("../data/conll2002/test.txt", "../data/conll2002/test.ud.conllx")
+
+nlp = spacy.load('nl_core_news_sm', disable=['tagger','ner'])
+
+process_dutch("../data/dutch/train.txt", "../data/dutch/train.ud.conllx")
+process_dutch("../data/dutch/dev.txt", "../data/dutch/dev.ud.conllx")
+process_dutch("../data/dutch/test.txt", "../data/dutch/test.ud.conllx")
+
+
+nlp = spacy.load('de_core_news_md', disable=['ner'])
+
+process_german("../data/german/train.txt", "../data/german/train.ud.conllx")
+process_german("../data/german/dev.txt", "../data/german/dev.ud.conllx")
+process_german("../data/german/test.txt", "../data/german/test.ud.conllx")
