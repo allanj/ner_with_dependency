@@ -17,6 +17,7 @@ class RGCNLayer(nn.Module):
         self.bias = bias
         self.activation = activation
         self.is_input_layer = is_input_layer
+        self.edge_gate = config.edge_gate
 
         # sanity check
         if self.num_bases <= 0 or self.num_bases > self.num_rels:
@@ -42,6 +43,8 @@ class RGCNLayer(nn.Module):
         if self.bias:
             nn.init.xavier_uniform_(self.bias,
                                     gain=nn.init.calculate_gain('relu'))
+        if self.edge_gate:
+            self.linear = nn.Linear(2 * self.out_feat , self.out_feat)
 
     def forward(self, g):
         if self.num_bases < self.num_rels:
@@ -58,7 +61,11 @@ class RGCNLayer(nn.Module):
             w = weight[edges.data['rel_type'].long().to(self.config.device)]
             msg = torch.bmm(edges.src['h'].unsqueeze(1), w).squeeze()
             msg = msg * edges.data['norm'].to(self.config.device)
-            return {'msg': msg}
+            gate = torch.sigmoid(self.linear(torch.cat([msg, edges.src['h']])))
+            if self.edge_gate:
+                return {'msg': msg, 'gate': gate}
+            else:
+                return {'msg': msg}
 
         def apply_func(nodes):
             h = nodes.data['h']
