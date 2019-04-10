@@ -64,7 +64,8 @@ class DepLabeledGCN(nn.Module):
         :param dep_label_matrix:
         :return:
         """
-
+        adj_matrix = adj_matrix.to(self.device)
+        dep_label_matrix = dep_label_matrix.to(self.device)
         batch_size, sent_len, input_dim = gcn_inputs.size()
 
         denom = adj_matrix.sum(2).unsqueeze(2) + 1

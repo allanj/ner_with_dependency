@@ -6,9 +6,10 @@ import dgl.function as fn
 from functools import partial
 
 class RGCNLayer(nn.Module):
-    def __init__(self, in_feat, out_feat, num_rels, num_bases=-1, bias=None,
+    def __init__(self, config, in_feat, out_feat, num_rels, num_bases=-1, bias=None,
                  activation=None, is_input_layer=False):
         super(RGCNLayer, self).__init__()
+        self.config = config
         self.in_feat = in_feat
         self.out_feat = out_feat
         self.num_rels = num_rels
@@ -23,14 +24,14 @@ class RGCNLayer(nn.Module):
 
         # weight bases in equation (3)
         self.weight = nn.Parameter(torch.Tensor(self.num_bases, self.in_feat,
-                                                self.out_feat))
+                                                self.out_feat).to(config.device))
         if self.num_bases < self.num_rels:
             # linear combination coefficients in equation (3)
-            self.w_comp = nn.Parameter(torch.Tensor(self.num_rels, self.num_bases))
+            self.w_comp = nn.Parameter(torch.Tensor(self.num_rels, self.num_bases).to(config.device))
 
         # add bias
         if self.bias:
-            self.bias = nn.Parameter(torch.Tensor(out_feat))
+            self.bias = nn.Parameter(torch.Tensor(out_feat).to(config.device))
 
         # init trainable parameters
         nn.init.xavier_uniform_(self.weight,
@@ -53,10 +54,10 @@ class RGCNLayer(nn.Module):
 
 
         def message_func(edges):
-            hidden = edges.src['id'] if self.is_input_layer else edges.src['h']
-            w = weight[edges.data['rel_type'].long()]
-            msg = torch.bmm(hidden.unsqueeze(1), w).squeeze()
-            # msg = msg * edges.data['norm']
+
+            w = weight[edges.data['rel_type'].long().to(self.config.device)]
+            msg = torch.bmm(edges.src['h'].unsqueeze(1), w).squeeze()
+            msg = msg * edges.data['norm'].to(self.config.device)
             return {'msg': msg}
 
         def apply_func(nodes):
@@ -73,6 +74,7 @@ class RGCNLayer(nn.Module):
 class DepRGCN(nn.Module):
     def __init__(self, config, input_dim):
         super(DepRGCN, self).__init__()
+        self.config = config
         self.input_dim = input_dim
         self.h_dim = config.dep_hidden_dim
         self.num_rels = len(config.deplabels)
@@ -86,17 +88,17 @@ class DepRGCN(nn.Module):
     def build_model(self):
         self.layers = nn.ModuleList()
         # # input to hidden
-        i2h = self.build_hidden_layer(True)
-        self.layers.append(i2h)
+        # i2h = self.build_hidden_layer(True)
+        # self.layers.append(i2h)
         # hidden to hidden
-        for _ in range(self.num_hidden_layers - 1):
+        for _ in range(self.num_hidden_layers):
             h2h = self.build_hidden_layer(False)
             self.layers.append(h2h)
         # hidden to output
 
 
     def build_hidden_layer(self, is_input_layer):
-        return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases,
+        return RGCNLayer(self.config, self.h_dim, self.h_dim, self.num_rels, self.num_bases,
                          activation=F.relu, is_input_layer=is_input_layer)
 
     def forward(self, feats, g): ##is a batched graph.
@@ -107,7 +109,7 @@ class DepRGCN(nn.Module):
         :return:
         """
         batch_size, sent_len, self.input_dim = feats.size()
-        g.ndata['id'] = feats.contiguous().view(-1, self.input_dim)
+        g.ndata['h'] = feats.contiguous().view(-1, self.input_dim)
         for layer in self.layers:
             layer(g)
         output = g.ndata.pop('h').view(batch_size, sent_len, -1)

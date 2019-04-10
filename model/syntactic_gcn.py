@@ -77,7 +77,9 @@ class SyntacticGCN(nn.Module):
         :param dep_label_matrix:
         :return:
         """
-
+        adj_matrix_in = adj_matrix_in.to(self.device)
+        adj_matrix_out = adj_matrix_out.to(self.device)
+        dep_label_matrix = dep_label_matrix.to(self.device)
         batch_size, sent_len, input_dim = gcn_inputs.size()
 
         # denom = adj_matrix_in.sum(2).unsqueeze(2) + adj_matrix_out.sum(2).unsqueeze(2) + 1

@@ -65,44 +65,65 @@ def simple_batching(config, insts: List[Instance]):
     trees = None
     graphs = None
     if config.dep_method != DepMethod.none:
-        if "gcn" in config.dep_method.name:
+        if "lgcn" in config.dep_method.name:
             adjs = [ head_to_adj(max_seq_len, inst, config) for inst in batch_data]
             adjs = np.stack(adjs, axis=0)
             adjs = torch.from_numpy(adjs)
-            dep_label_adj = [head_to_adj_label(max_seq_len, inst, config) for inst in batch_data]
-            dep_label_adj = torch.from_numpy(np.stack(dep_label_adj, axis=0)).long()
 
+
+        if "sgcn" in config.dep_method.name:
             adjs_in = [head_to_adj_directed(max_seq_len, inst, "in") for inst in batch_data]
             adjs_in = np.stack(adjs_in, axis=0)
             adjs_in = torch.from_numpy(adjs_in)
             adjs_out = [head_to_adj_directed(max_seq_len, inst, "out") for inst in batch_data]
             adjs_out = np.stack(adjs_out, axis=0)
             adjs_out = torch.from_numpy(adjs_out)
+        if  "lgcn" in config.dep_method.name or "sgcn" in config.dep_method.name:
+            dep_label_adj = [head_to_adj_label(max_seq_len, inst, config) for inst in batch_data]
+            dep_label_adj = torch.from_numpy(np.stack(dep_label_adj, axis=0)).long()
 
+        if "rgcn" in config.dep_method.name:
             graphs = []
             for inst in batch_data:
                 g = dgl.DGLGraph()
-                g.add_nodes(max_seq_len.item())
+                max_len = max_seq_len.item()
+                g.add_nodes(max_len)
                 if len(inst.input.heads) > 1:
                     edge_list = [(head, i)  for i, head in enumerate(inst.input.heads) if head != -1 ]
                     src, dst = tuple(zip(*edge_list))
                     g.add_edges(src, dst)
-                edge_types = [inst.dep_label_ids[i] for i, head in enumerate(inst.input.heads) if head != -1]
-                edge_type = torch.from_numpy(np.asarray(edge_types, dtype=np.int))
-                g.edata.update({'rel_type': edge_type})
+                g.add_edges(g.nodes(), g.nodes())
                 # g.add_edges(dst, src) # edges are directional in DGL; make them bi-directional
-                graphs.append(g)
+                edge_types = [inst.dep_label_ids[i] for i, head in enumerate(inst.input.heads) if head != -1]
+                edge_types += [config.deplabel2idx[config.self_label] for _ in range(max_len)]
+                edge_type = torch.from_numpy(np.asarray(edge_types, dtype=np.int))
 
-        batch_dep_heads = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
-        dep_label_tensor = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
-        trees = [inst.tree for inst in batch_data]
+
+                count = [{config.deplabel2idx[config.self_label]: 1} for i in range(len(inst.input.words))]
+                for i, head in enumerate(inst.input.heads):
+                    if head == -1:
+                        continue
+                    if inst.dep_label_ids[i] in count[head]:
+                        count[head][inst.dep_label_ids[i]] += 1
+                    else:
+                        count[head][inst.dep_label_ids[i]] = 1
+                edge_norms = [1/count[head][inst.dep_label_ids[i]] for i, head in enumerate(inst.input.heads) if head != -1]
+                edge_norms += [1.0 for _ in range(max_len)]
+                edge_norms = torch.from_numpy(np.asarray(edge_norms, dtype=np.float32)).unsqueeze(1)
+                g.edata.update({'rel_type': edge_type, 'norm': edge_norms})
+                graphs.append(g)
+                count = None
+        if config.dep_method == DepMethod.feat_emb  or config.dep_method == DepMethod.feat_head_only:
+            batch_dep_heads = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
+            dep_label_tensor = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
+        # trees = [inst.tree for inst in batch_data]
     for idx in range(batch_size):
         word_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].word_ids)
         label_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].output_ids)
         if config.context_emb != ContextEmb.none:
             word_emb_tensor[idx, :word_seq_len[idx], :] = torch.from_numpy(batch_data[idx].elmo_vec)
 
-        if config.dep_method != DepMethod.none:
+        if config.dep_method == DepMethod.feat_emb or config.dep_method == DepMethod.feat_head_only:
             batch_dep_heads[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].dep_head_ids)
             dep_label_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].dep_label_ids)
         for word_idx in range(word_seq_len[idx]):
@@ -118,14 +139,15 @@ def simple_batching(config, insts: List[Instance]):
     # if config.use_elmo:
     #     word_emb_tensor = word_emb_tensor.to(config.device)
     if config.dep_method != DepMethod.none:
-        if "gcn" in config.dep_method.name:
-            adjs = adjs.to(config.device)
-            adjs_in = adjs_in.to(config.device)
-            adjs_out = adjs_out.to(config.device)
+        if "rgcn" in config.dep_method.name:
+            # adjs = adjs.to(config.device)
+            # adjs_in = adjs_in.to(config.device)
+            # adjs_out = adjs_out.to(config.device)
             graphs = dgl.batch(graphs)
-            dep_label_adj = dep_label_adj.to(config.device)
-        batch_dep_heads = batch_dep_heads.to(config.device)
-        dep_label_tensor = dep_label_tensor.to(config.device)
+            # dep_label_adj = dep_label_adj.to(config.device)
+        if config.dep_method == DepMethod.feat_emb  or config.dep_method == DepMethod.feat_head_only:
+            batch_dep_heads = batch_dep_heads.to(config.device)
+            dep_label_tensor = dep_label_tensor.to(config.device)
 
     return word_seq_tensor, word_seq_len, word_emb_tensor, char_seq_tensor, char_seq_len, adjs, adjs_in, adjs_out, graphs, dep_label_adj, batch_dep_heads, trees, label_seq_tensor, dep_label_tensor
 

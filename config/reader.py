@@ -19,6 +19,7 @@ class Reader:
     def read_conll(self, file: str, number: int = -1, is_train: bool = True) -> List[Instance]:
         print("Reading file: " + file)
         insts = []
+        num_entity = 0
         # vocab = set() ## build the vocabulary
         with open(file, 'r', encoding='utf-8') as f:
             words = []
@@ -55,7 +56,9 @@ class Reader:
                 tags.append(pos)
                 self.vocab.add(word)
                 labels.append(label)
-        print("number of sentences: {}".format(len(insts)))
+                if label.startswith("B-"):
+                    num_entity +=1
+        print("number of sentences: {}, number of entities: {}".format(len(insts), num_entity))
         return insts
 
     def read_txt(self, file: str, number: int = -1, is_train: bool = True) -> List[Instance]:
