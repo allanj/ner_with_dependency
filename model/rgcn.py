@@ -61,22 +61,28 @@ class RGCNLayer(nn.Module):
             w = weight[edges.data['rel_type'].long().to(self.config.device)]
             msg = torch.bmm(edges.src['h'].unsqueeze(1), w).squeeze()
             msg = msg * edges.data['norm'].to(self.config.device)
-            gate = torch.sigmoid(self.linear(torch.cat([msg, edges.src['h']])))
+
             if self.edge_gate:
+                gate = torch.sigmoid(self.linear(torch.cat([msg, edges.src['h']], 1)))
                 return {'msg': msg, 'gate': gate}
             else:
                 return {'msg': msg}
 
         def apply_func(nodes):
-            h = nodes.data['h']
+            u = nodes.data['u'] if self.edge_gate else nodes.data['h']
             if self.bias:
-                h = h + self.bias
+                u = u + self.bias
             if self.activation is not None:
-                h = self.activation(h)
-            return {'h': h}
+                u = self.activation(u)
+            if self.edge_gate:
+                a = torch.sigmoid(self.linear(torch.cat([u, nodes.data['h']], 1)))
+                u = u * a + nodes.data['h'] * (1 - a)
+            return {'h': u}
 
-        g.update_all(message_func, fn.sum(msg='msg', out='h'), apply_func)
-
+        if self.edge_gate:
+            g.update_all(message_func, fn.sum(msg='msg', out='u'), apply_func)
+        else:
+            g.update_all(message_func, fn.sum(msg='msg', out='h'), apply_func)
 
 class DepRGCN(nn.Module):
     def __init__(self, config, input_dim):
@@ -90,7 +96,7 @@ class DepRGCN(nn.Module):
 
         # create rgcn layers
         self.build_model()
-
+        print("[Model Info] Using edge gate: {}".format(bool(config.edge_gate)))
 
     def build_model(self):
         self.layers = nn.ModuleList()

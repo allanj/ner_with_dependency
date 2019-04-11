@@ -61,6 +61,7 @@ def parse_arguments(parser):
     parser.add_argument('--gcn_adj_directed', type=int, default=0, choices=[0, 1], help="GCN ajacent matrix directed")
     parser.add_argument('--gcn_adj_selfloop', type=int, default=0, choices=[0, 1], help="GCN selfloop in adjacent matrix, now always false as add it in the model")
     parser.add_argument('--gcn_gate', type=int, default=0, choices=[0, 1], help="add edge_wise gating")
+    parser.add_argument('--dep_double_label', type=int, default=0, choices=[0, 1], help="double the dependency labels with direction.")
 
     ##NOTE: this dropout applies to many places
     parser.add_argument('--dropout', type=float, default=0.5, help="dropout for embedding")
@@ -122,8 +123,8 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
     best_dev = [-1, 0]
     best_test = [-1, 0]
 
-    model_name = "model_files/lstm_{}_crf_{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}.m".format(config.hidden_dim, config.dataset, config.train_num, config.dep_method.name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, epoch, config.learning_rate)
-    res_name = "results/lstm_{}_crf_{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}.results".format(config.hidden_dim, config.dataset, config.train_num, config.dep_method.name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, epoch, config.learning_rate)
+    model_name = "model_files/lstm_{}_crf_{}{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}.m".format(config.hidden_dim, config.dataset, config.affix, config.train_num, config.dep_method.name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, epoch, config.learning_rate)
+    res_name = "results/lstm_{}_crf_{}{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}.results".format(config.hidden_dim, config.dataset,config.affix, config.train_num, config.dep_method.name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, epoch, config.learning_rate)
     print("[Info] The model will be saved to: %s, please ensure models folder exist" % (model_name))
 
     for i in range(1, epoch + 1):
@@ -190,8 +191,8 @@ def evaluate(config:Config, model: NNCRF, batch_insts_ids, name:str, insts: List
 
 
 def test_model(config: Config, test_insts):
-    model_name = "model_files/lstm_{}_crf_{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}.m".format(config.hidden_dim,
-                                                                                                   config.dataset,
+    model_name = "model_files/lstm_{}_crf_{}{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}.m".format(config.hidden_dim,
+                                                                                                   config.dataset, config.affix,
                                                                                                    config.train_num,
                                                                                                    config.dep_method.name,
                                                                                                    config.context_emb.name,
@@ -199,8 +200,8 @@ def test_model(config: Config, test_insts):
                                                                                                    config.edge_gate,
                                                                                                    config.num_epochs,
                                                                                                    config.learning_rate)
-    res_name = "results/lstm_{}_crf_{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}.results".format(config.hidden_dim,
-                                                                                                   config.dataset,
+    res_name = "results/lstm_{}_crf_{}{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}.results".format(config.hidden_dim,
+                                                                                                   config.dataset, config.affix,
                                                                                                    config.train_num,
                                                                                                    config.dep_method.name,
                                                                                                    config.context_emb.name,
@@ -253,9 +254,9 @@ def main():
 
     if conf.context_emb != ContextEmb.none:
         print('Loading the {} vectors for all datasets.'.format(conf.context_emb.name))
-        conf.context_emb_size = reader.load_elmo_vec(conf.train_file.replace(".sd", "").replace(".ud", "").replace(".sud", "") + "."+conf.context_emb.name+".vec", trains)
-        reader.load_elmo_vec(conf.dev_file.replace(".sd", "").replace(".ud", "").replace(".sud", "")  + "."+conf.context_emb.name+".vec", devs)
-        reader.load_elmo_vec(conf.test_file.replace(".sd", "").replace(".ud", "").replace(".sud", "") + "."+conf.context_emb.name+".vec", tests)
+        conf.context_emb_size = reader.load_elmo_vec(conf.train_file.replace(".sd", "").replace(".ud", "").replace(".sud", "").replace(".predsd", "").replace(".predud", "") + "."+conf.context_emb.name+".vec", trains)
+        reader.load_elmo_vec(conf.dev_file.replace(".sd", "").replace(".ud", "").replace(".sud", "").replace(".predsd", "").replace(".predud", "")  + "."+conf.context_emb.name+".vec", devs)
+        reader.load_elmo_vec(conf.test_file.replace(".sd", "").replace(".ud", "").replace(".sud", "").replace(".predsd", "").replace(".predud", "") + "."+conf.context_emb.name+".vec", tests)
     conf.use_iobes(trains)
     conf.use_iobes(devs)
     conf.use_iobes(tests)

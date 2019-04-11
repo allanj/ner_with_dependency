@@ -92,9 +92,17 @@ def simple_batching(config, insts: List[Instance]):
                     edge_list = [(head, i)  for i, head in enumerate(inst.input.heads) if head != -1 ]
                     src, dst = tuple(zip(*edge_list))
                     g.add_edges(src, dst)
+                    if not config.adj_directed:
+                        g.add_edges(dst, src) # edges are directional in DGL; make them bi-directional
                 g.add_edges(g.nodes(), g.nodes())
-                # g.add_edges(dst, src) # edges are directional in DGL; make them bi-directional
+
+
                 edge_types = [inst.dep_label_ids[i] for i, head in enumerate(inst.input.heads) if head != -1]
+                if not config.adj_directed:
+                    if not config.double_dep_label:
+                        edge_types += [inst.dep_label_ids[i] for i, head in enumerate(inst.input.heads) if head != -1]
+                    else:
+                        edge_types += [inst.dep_label_ids[i]+1 for i, head in enumerate(inst.input.heads) if head != -1]
                 edge_types += [config.deplabel2idx[config.self_label] for _ in range(max_len)]
                 edge_type = torch.from_numpy(np.asarray(edge_types, dtype=np.int))
 
@@ -103,11 +111,22 @@ def simple_batching(config, insts: List[Instance]):
                 for i, head in enumerate(inst.input.heads):
                     if head == -1:
                         continue
-                    if inst.dep_label_ids[i] in count[head]:
-                        count[head][inst.dep_label_ids[i]] += 1
+                    if inst.dep_label_ids[i] in count[i]:
+                        count[i][inst.dep_label_ids[i]] += 1
                     else:
-                        count[head][inst.dep_label_ids[i]] = 1
-                edge_norms = [1/count[head][inst.dep_label_ids[i]] for i, head in enumerate(inst.input.heads) if head != -1]
+                        count[i][inst.dep_label_ids[i]] = 1
+                    if not config.adj_directed: ## bidirection
+                        label_id = inst.dep_label_ids[i] if not config.double_dep_label else inst.dep_label_ids[i] + 1
+                        if label_id in count[head]:
+                            count[head][label_id] += 1
+                        else:
+                            count[head][label_id] = 1
+                edge_norms = [1.0/count[i][inst.dep_label_ids[i]] for i, head in enumerate(inst.input.heads) if head != -1]
+                if not config.adj_directed:
+                    if not config.double_dep_label:
+                        edge_norms += [1.0 / count[head][inst.dep_label_ids[i]] for i, head in enumerate(inst.input.heads) if head != -1]
+                    else:
+                        edge_norms += [1.0 / count[head][inst.dep_label_ids[i] + 1] for i, head in enumerate(inst.input.heads) if head != -1]
                 edge_norms += [1.0 for _ in range(max_len)]
                 edge_norms = torch.from_numpy(np.asarray(edge_norms, dtype=np.float32)).unsqueeze(1)
                 g.edata.update({'rel_type': edge_type, 'norm': edge_norms})

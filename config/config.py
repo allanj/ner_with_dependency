@@ -124,6 +124,7 @@ class Config:
         self.adj_directed = args.gcn_adj_directed
         self.adj_self_loop = args.gcn_adj_selfloop
         self.edge_gate = args.gcn_gate
+        self.double_dep_label = args.dep_double_label
 
         self.dep_emb_size = args.dep_emb_size
         self.deplabel2idx = {}
@@ -243,6 +244,10 @@ class Config:
                 if label not in self.deplabels:
                     self.deplabels.append(label)
                     self.deplabel2idx[label] = len(self.deplabel2idx)
+                    if self.double_dep_label:
+                        label = label + "_prime"
+                        self.deplabels.append(label) # thus, the id of prime label must be incremented by one as the original label
+                        self.deplabel2idx[label] = len(self.deplabel2idx)
         self.root_dep_label_id = self.deplabel2idx[self.root_dep_label]
 
     def build_label_idx(self, insts):
