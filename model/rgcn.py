@@ -91,7 +91,7 @@ class DepRGCN(nn.Module):
         self.input_dim = input_dim
         self.h_dim = config.dep_hidden_dim
         self.num_rels = len(config.deplabels)
-        self.num_bases = len(config.deplabels)
+        self.num_bases = len(config.deplabels) if config.num_base == -1 else config.num_base
         self.num_hidden_layers = config.num_gcn_layers
 
         # create rgcn layers

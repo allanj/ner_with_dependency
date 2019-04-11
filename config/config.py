@@ -125,6 +125,7 @@ class Config:
         self.adj_self_loop = args.gcn_adj_selfloop
         self.edge_gate = args.gcn_gate
         self.double_dep_label = args.dep_double_label
+        self.num_base = args.num_base
 
         self.dep_emb_size = args.dep_emb_size
         self.deplabel2idx = {}
