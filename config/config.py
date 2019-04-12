@@ -73,16 +73,16 @@ class Config:
         #     self.dev_file = "data/" + self.dataset + "/test.conllx"
         # self.test_file = "data/" + self.dataset + "/test.txt"
 
-        self.affix = "." + args.affix
-        if self.dataset == "all":
-            self.affix = ""
+        self.affix = args.affix
+        # if self.dataset == "all":
+        #     self.affix = ""
 
-        self.train_file = "data/" + self.dataset + "/train"+self.affix+".conllx"
-        self.dev_file = "data/" + self.dataset + "/dev"+self.affix+".conllx"
+        self.train_file = "data/" + self.dataset + "/train."+self.affix+".conllx"
+        self.dev_file = "data/" + self.dataset + "/dev."+self.affix+".conllx"
         ## following datasets do not have development set
         if self.dataset in ("abc", "cnn", "mnb", "nbc", "p25", "pri", "voa"):
             self.dev_file = "data/" + self.dataset + "/test.conllx"
-        self.test_file = "data/" + self.dataset + "/test"+self.affix+".conllx"
+        self.test_file = "data/" + self.dataset + "/test."+self.affix+".conllx"
         self.label2idx = {}
         self.idx2labels = []
         self.char2idx = {}

@@ -44,7 +44,7 @@ class RGCNLayer(nn.Module):
             nn.init.xavier_uniform_(self.bias,
                                     gain=nn.init.calculate_gain('relu'))
         if self.edge_gate:
-            self.linear = nn.Linear(2 * self.out_feat , self.out_feat)
+            self.linear = nn.Linear(2 * self.out_feat , self.out_feat).to(config.device)
 
     def forward(self, g):
         if self.num_bases < self.num_rels:
