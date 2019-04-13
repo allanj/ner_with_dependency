@@ -124,8 +124,8 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
     best_dev = [-1, 0]
     best_test = [-1, 0]
 
-    model_name = "model_files/lstm_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.m".format(config.hidden_dim, config.dataset, config.affix, config.train_num, config.dep_method.name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, config.num_base, epoch, config.learning_rate)
-    res_name = "results/lstm_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.results".format(config.hidden_dim, config.dataset,config.affix, config.train_num, config.dep_method.name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, config.num_base, epoch, config.learning_rate)
+    model_name = "model_files/lstm_{}_crf_{}_{}_{}_dep_{}_emb_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.m".format(config.hidden_dim, config.dataset, config.affix, config.train_num, config.dep_method.name, config.dep_emb_size, config.context_emb.name, config.optimizer.lower(), config.edge_gate, config.num_base, epoch, config.learning_rate)
+    res_name = "results/lstm_{}_crf_{}_{}_{}_dep_{}_emb_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.results".format(config.hidden_dim, config.dataset,config.affix, config.train_num, config.dep_method.name, config.dep_emb_size, config.context_emb.name, config.optimizer.lower(), config.edge_gate, config.num_base, epoch, config.learning_rate)
     print("[Info] The model will be saved to: %s, please ensure models folder exist" % (model_name))
 
     for i in range(1, epoch + 1):
@@ -192,20 +192,22 @@ def evaluate(config:Config, model: NNCRF, batch_insts_ids, name:str, insts: List
 
 
 def test_model(config: Config, test_insts):
-    model_name = "model_files/lstm_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.m".format(config.hidden_dim,
+    model_name = "model_files/lstm_{}_crf_{}_{}_{}_dep_{}_emb_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.m".format(config.hidden_dim,
                                                                                                    config.dataset, config.affix,
                                                                                                    config.train_num,
                                                                                                    config.dep_method.name,
+                                                                                                   config.dep_emb_size,
                                                                                                    config.context_emb.name,
                                                                                                    config.optimizer.lower(),
                                                                                                    config.edge_gate,
                                                                                                    config.num_base,
                                                                                                    config.num_epochs,
                                                                                                    config.learning_rate)
-    res_name = "results/lstm_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.results".format(config.hidden_dim,
+    res_name = "results/lstm_{}_crf_{}_{}_{}_dep_{}_emb_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.results".format(config.hidden_dim,
                                                                                                    config.dataset, config.affix,
                                                                                                    config.train_num,
                                                                                                    config.dep_method.name,
+                                                                                                   config.dep_emb_size,
                                                                                                    config.context_emb.name,
                                                                                                    config.optimizer.lower(),
                                                                                                    config.edge_gate,
@@ -271,9 +273,9 @@ def main():
     print("# deplabels: ", len(conf.deplabels))
     print("dep label 2idx: ", conf.deplabel2idx)
 
-    conf.build_trees(trains)
-    conf.build_trees(devs)
-    conf.build_trees(tests)
+    # conf.build_trees(trains)
+    # conf.build_trees(devs)
+    # conf.build_trees(tests)
 
 
     conf.build_word_idx(trains, devs, tests)

@@ -308,16 +308,16 @@ class Config:
                     else:
                         char_id.append(self.char2idx[self.UNK])
                 inst.char_ids.append(char_id)
-            for head in inst.input.heads:
-                if head == -1:
-                    inst.dep_head_ids.append(self.word2idx[self.ROOT])
-                else:
-                    word = inst.input.words[head]
-                    if word in self.word2idx:
-                        inst.dep_head_ids.append(self.word2idx[word])
-                    else:
-                        inst.dep_head_ids.append(self.word2idx[self.UNK])
-
+            # for head in inst.input.heads:
+            #     if head == -1:
+            #         inst.dep_head_ids.append(self.word2idx[self.ROOT])
+            #     else:
+            #         word = inst.input.words[head]
+            #         if word in self.word2idx:
+            #             inst.dep_head_ids.append(self.word2idx[word])
+            #         else:
+            #             inst.dep_head_ids.append(self.word2idx[self.UNK])
+            inst.dep_head_ids = inst.input.heads
             for label in inst.input.dep_labels:
                 inst.dep_label_ids.append(self.deplabel2idx[label])
             for label in inst.output:
