@@ -51,10 +51,7 @@ class Reader:
                 if self.digit2zero:
                     word = re.sub('\d', '0', word) # replace digit with 0.
                 words.append(word)
-                if head == 0:
-                    heads.append(len(heads))  ##instead of -1.
-                else:
-                    heads.append(head - 1) ## because of 0-indexed.
+                heads.append(head - 1) ## because of 0-indexed.
                 deps.append(dep_label)
                 tags.append(pos)
                 self.vocab.add(word)

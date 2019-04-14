@@ -57,10 +57,6 @@ class NNCRF(nn.Module):
             self.input_size += config.embedding_dim
         elif self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.tree_lstm:
             self.input_size += config.embedding_dim + config.dep_emb_size
-            if self.context_emb != ContextEmb.none:
-                self.input_size += config.context_emb_size
-            if self.use_char:
-                self.input_size += config.charlstm_hidden_dim
         elif self.dep_method == DepMethod.label_gcn_lstm or self.dep_method == DepMethod.lgcn_lstm:
             self.input_size = config.dep_hidden_dim ##because gcn first, the input to lstm becomes the hidden size of gcn
 
@@ -131,7 +127,6 @@ class NNCRF(nn.Module):
         :param chars: (batch_size * sent_len * word_length)
         :param char_seq_lens: numpy (batch_size * sent_len , 1)
         :param dep_label_tensor: (batch_size, max_sent_len)
-        :param dep_head_tensor: (batch_size, max_sent_len)
         :return: emission scores (batch_size, sent_len, hidden_dim)
         """
         batch_size = word_seq_tensor.size(0)
@@ -144,8 +139,6 @@ class NNCRF(nn.Module):
             char_features = self.char_feature.get_last_hiddens(char_inputs, char_seq_lens)
             word_emb = torch.cat([word_emb, char_features], 2)
         # if self.use_head:
-
-        emb_size = word_emb.size(2)
         """
           Word Representation
         """
@@ -153,8 +146,7 @@ class NNCRF(nn.Module):
             dep_head_emb = self.word_embedding(dep_head_tensor)
             word_emb = torch.cat([word_emb, dep_head_emb], 2)
         elif self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.tree_lstm:
-            # dep_head_emb = self.word_embedding(dep_head_tensor)
-            dep_head_emb = torch.gather(word_emb, 1 , dep_head_tensor.view(batch_size, sent_len, 1).expand(batch_size, sent_len, emb_size))
+            dep_head_emb = self.word_embedding(dep_head_tensor)
             dep_emb = self.dep_label_embedding(dep_label_tensor)
             word_emb = torch.cat([word_emb, dep_head_emb, dep_emb], 2)
         # elif self.dep_method == DepMethod.gcn:
