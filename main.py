@@ -4,7 +4,7 @@ import random
 import numpy as np
 from config.reader import Reader
 from config import eval
-from config.config import Config, ContextEmb
+from config.config import Config, ContextEmb, DepMethod
 import time
 from model.lstmcrf import NNCRF
 import torch
@@ -53,6 +53,7 @@ def parse_arguments(parser):
 
     ##model hyperparameter
     parser.add_argument('--hidden_dim', type=int, default=200, help="hidden size of the LSTM")
+    parser.add_argument('--num_lstm_layer', type=int, default=1, help="number of lstm layers")
     parser.add_argument('--dep_emb_size', type=int, default=50, help="embedding size of dependency")
     parser.add_argument('--dep_hidden_dim', type=int, default=200, help="hidden size of gcn, tree lstm")
     parser.add_argument('--num_gcn_layers', type=int, default=1, help="number of gcn layers")
@@ -124,8 +125,8 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
     best_dev = [-1, 0]
     best_test = [-1, 0]
 
-    model_name = "model_files/lstm_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.m".format(config.hidden_dim, config.dataset, config.affix, config.train_num, config.dep_method.name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, config.num_base, epoch, config.learning_rate)
-    res_name = "results/lstm_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.results".format(config.hidden_dim, config.dataset,config.affix, config.train_num, config.dep_method.name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, config.num_base, epoch, config.learning_rate)
+    model_name = "model_files/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.m".format(config.num_lstm_layer, config.hidden_dim, config.dataset, config.affix, config.train_num, config.dep_method.name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, config.num_base, epoch, config.learning_rate)
+    res_name = "results/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.results".format(config.num_lstm_layer, config.hidden_dim, config.dataset,config.affix, config.train_num, config.dep_method.name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, config.num_base, epoch, config.learning_rate)
     print("[Info] The model will be saved to: %s, please ensure models folder exist" % (model_name))
 
     for i in range(1, epoch + 1):
@@ -141,7 +142,8 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
             loss = model.neg_log_obj(batch_word, batch_wordlen, batch_context_emb,batch_char, batch_charlen, adj_matrixs, adjs_in, adjs_out, graphs, dep_label_adj, batch_dep_heads, batch_label, batch_dep_label, trees)
             epoch_loss += loss.item()
             loss.backward()
-            # # torch.nn.utils.clip_grad_norm_(model.parameters(), config.clip) ##clipping the gradient
+            # if config.dep_method == DepMethod.lstm_lgcn:
+            #     torch.nn.utils.clip_grad_norm_(model.parameters(), config.clip) ##clipping the gradient
             optimizer.step()
             model.zero_grad()
 
@@ -192,7 +194,7 @@ def evaluate(config:Config, model: NNCRF, batch_insts_ids, name:str, insts: List
 
 
 def test_model(config: Config, test_insts):
-    model_name = "model_files/lstm_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.m".format(config.hidden_dim,
+    model_name = "model_files/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.m".format(config.num_lstm_layer, config.hidden_dim,
                                                                                                    config.dataset, config.affix,
                                                                                                    config.train_num,
                                                                                                    config.dep_method.name,
@@ -202,7 +204,7 @@ def test_model(config: Config, test_insts):
                                                                                                    config.num_base,
                                                                                                    config.num_epochs,
                                                                                                    config.learning_rate)
-    res_name = "results/lstm_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.results".format(config.hidden_dim,
+    res_name = "results/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.results".format(config.num_lstm_layer, config.hidden_dim,
                                                                                                    config.dataset, config.affix,
                                                                                                    config.train_num,
                                                                                                    config.dep_method.name,
@@ -271,9 +273,9 @@ def main():
     print("# deplabels: ", len(conf.deplabels))
     print("dep label 2idx: ", conf.deplabel2idx)
 
-    conf.build_trees(trains)
-    conf.build_trees(devs)
-    conf.build_trees(tests)
+    # conf.build_trees(trains)
+    # conf.build_trees(devs)
+    # conf.build_trees(tests)
 
 
     conf.build_word_idx(trains, devs, tests)

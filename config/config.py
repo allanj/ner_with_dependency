@@ -107,6 +107,7 @@ class Config:
         self.device = torch.device(args.device)
 
         self.hidden_dim = args.hidden_dim
+        self.num_lstm_layer = args.num_lstm_layer
         # self.tanh_hidden_dim = args.tanh_hidden_dim
         self.use_brnn = True
         self.num_layers = 1
@@ -308,16 +309,18 @@ class Config:
                     else:
                         char_id.append(self.char2idx[self.UNK])
                 inst.char_ids.append(char_id)
-            for head in inst.input.heads:
+            for i, head in enumerate(inst.input.heads):
                 if head == -1:
-                    inst.dep_head_ids.append(self.word2idx[self.ROOT])
+                    # inst.dep_head_ids.append(self.word2idx[self.ROOT])
+                    inst.dep_head_ids.append(i) ## appended it self.
                 else:
-                    word = inst.input.words[head]
-                    if word in self.word2idx:
-                        inst.dep_head_ids.append(self.word2idx[word])
-                    else:
-                        inst.dep_head_ids.append(self.word2idx[self.UNK])
-
+                    inst.dep_head_ids.append(head)
+                    # word = inst.input.words[head]
+                    # if word in self.word2idx:
+                    #     inst.dep_head_ids.append(self.word2idx[word])
+                    # else:
+                    #     inst.dep_head_ids.append(self.word2idx[self.UNK])
+            # inst.dep_head_ids = inst.input.heads
             for label in inst.input.dep_labels:
                 inst.dep_label_ids.append(self.deplabel2idx[label])
             for label in inst.output:

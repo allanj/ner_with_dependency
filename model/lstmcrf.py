@@ -27,7 +27,9 @@ class NNCRF(nn.Module):
         # self.use_head = config.use_head
         self.context_emb = config.context_emb
 
-
+        # if self.dep_method == DepMethod.feat_emb:
+        #     self.root_idx = torch.Tensor([config.word2idx[config.ROOT]]).long().to(self.device)
+        #     self.root_linear = nn.Linear(config.embedding_dim, config.hidden_dim).to(self.device)
 
         self.label2idx = config.label2idx
         self.labels = config.idx2labels
@@ -64,6 +66,15 @@ class NNCRF(nn.Module):
         print("[Model Info] LSTM Hidden Size: {}".format(config.hidden_dim))
 
         self.lstm = nn.LSTM(self.input_size, config.hidden_dim // 2, num_layers=1, batch_first=True, bidirectional=True).to(self.device)
+
+        self.num_lstm_layer = config.num_lstm_layer
+        self.lstm_hidden_dim = config.hidden_dim
+        self.embedding_dim = config.embedding_dim
+        if config.num_lstm_layer > 1 and self.dep_method == DepMethod.feat_emb:
+            self.add_lstms = nn.ModuleList()
+            print("[Model Info] Building {} more LSTMs, with size: {} x {} (without dep label highway connection)".format(config.num_lstm_layer-1, 2*config.hidden_dim, config.hidden_dim))
+            for i in range(config.num_lstm_layer - 1):
+                self.add_lstms.append(nn.LSTM(2 * config.hidden_dim, config.hidden_dim // 2, num_layers=1, batch_first=True, bidirectional=True).to(self.device))
 
         self.drop_lstm = nn.Dropout(config.dropout).to(self.device)
 
@@ -133,6 +144,10 @@ class NNCRF(nn.Module):
         sent_len = word_seq_tensor.size(1)
 
         word_emb = self.word_embedding(word_seq_tensor)
+        if self.dep_method == DepMethod.feat_emb:
+            # root_emb = self.word_embedding(self.root_idx).view(1, 1, self.embedding_dim).expand(batch_size, 1, self.embedding_dim)
+            # aug_emb = torch.cat([root_emb, word_emb], 1)
+            dep_head_emb = torch.gather(word_emb, 1, dep_head_tensor.view(batch_size, sent_len, 1).expand(batch_size, sent_len, self.embedding_dim))
         if self.context_emb != ContextEmb.none:
             word_emb = torch.cat([word_emb, batch_context_emb.to(self.device)], 2)
         if self.use_char:
@@ -146,7 +161,7 @@ class NNCRF(nn.Module):
             dep_head_emb = self.word_embedding(dep_head_tensor)
             word_emb = torch.cat([word_emb, dep_head_emb], 2)
         elif self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.tree_lstm:
-            dep_head_emb = self.word_embedding(dep_head_tensor)
+            # dep_head_emb = self.word_embedding(dep_head_tensor)
             dep_emb = self.dep_label_embedding(dep_label_tensor)
             word_emb = torch.cat([word_emb, dep_head_emb, dep_emb], 2)
         # elif self.dep_method == DepMethod.gcn:
@@ -175,6 +190,18 @@ class NNCRF(nn.Module):
         lstm_out, _ = pad_packed_sequence(lstm_out, batch_first=True)  ## CARE: make sure here is batch_first, otherwise need to transpose.
         feature_out = self.drop_lstm(lstm_out)
         ### TODO: dropout this lstm output or not, because ABB code do dropout.
+
+        if self.num_lstm_layer > 1:
+            for l in range(self.num_lstm_layer-1):
+                # root_emb = self.root_linear(root_emb)
+                # aug_feat = torch.cat([root_emb, feature_out], 1)
+                dep_head_emb = torch.gather(feature_out, 1, dep_head_tensor[permIdx].view(batch_size, sent_len, 1).expand(batch_size, sent_len, self.lstm_hidden_dim))
+                # dep_emb = self.dep_label_embedding(dep_label_tensor)
+                feature_out = torch.cat([feature_out, dep_head_emb], 2)
+                packed_words = pack_padded_sequence(feature_out, sorted_seq_len, True)
+                lstm_out, _ = self.add_lstms[l](packed_words, None)
+                lstm_out, _ = pad_packed_sequence(lstm_out, batch_first=True)  ## CARE: make sure here is batch_first, otherwise need to transpose.
+                feature_out = self.drop_lstm(lstm_out)
 
         """
         Model forward
