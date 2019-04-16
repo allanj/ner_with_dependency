@@ -59,6 +59,9 @@ class NNCRF(nn.Module):
             self.input_size += config.embedding_dim
         elif self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.tree_lstm:
             self.input_size += config.embedding_dim + config.dep_emb_size
+            if self.use_char:
+                self.input_size += config.charlstm_hidden_dim
+                self.charlstm_dim = config.charlstm_hidden_dim
         elif self.dep_method == DepMethod.label_gcn_lstm or self.dep_method == DepMethod.lgcn_lstm:
             self.input_size = config.dep_hidden_dim ##because gcn first, the input to lstm becomes the hidden size of gcn
 
@@ -72,9 +75,10 @@ class NNCRF(nn.Module):
         self.embedding_dim = config.embedding_dim
         if config.num_lstm_layer > 1 and self.dep_method == DepMethod.feat_emb:
             self.add_lstms = nn.ModuleList()
-            print("[Model Info] Building {} more LSTMs, with size: {} x {} (without dep label highway connection)".format(config.num_lstm_layer-1, 2*config.hidden_dim, config.hidden_dim))
+            hidden_size = 2 * config.hidden_dim
+            print("[Model Info] Building {} more LSTMs, with size: {} x {} (without dep label highway connection)".format(config.num_lstm_layer-1, hidden_size, config.hidden_dim))
             for i in range(config.num_lstm_layer - 1):
-                self.add_lstms.append(nn.LSTM(2 * config.hidden_dim, config.hidden_dim // 2, num_layers=1, batch_first=True, bidirectional=True).to(self.device))
+                self.add_lstms.append(nn.LSTM(hidden_size, config.hidden_dim // 2, num_layers=1, batch_first=True, bidirectional=True).to(self.device))
 
         self.drop_lstm = nn.Dropout(config.dropout).to(self.device)
 
@@ -144,15 +148,16 @@ class NNCRF(nn.Module):
         sent_len = word_seq_tensor.size(1)
 
         word_emb = self.word_embedding(word_seq_tensor)
-        if self.dep_method == DepMethod.feat_emb:
-            # root_emb = self.word_embedding(self.root_idx).view(1, 1, self.embedding_dim).expand(batch_size, 1, self.embedding_dim)
-            # aug_emb = torch.cat([root_emb, word_emb], 1)
-            dep_head_emb = torch.gather(word_emb, 1, dep_head_tensor.view(batch_size, sent_len, 1).expand(batch_size, sent_len, self.embedding_dim))
-        if self.context_emb != ContextEmb.none:
-            word_emb = torch.cat([word_emb, batch_context_emb.to(self.device)], 2)
         if self.use_char:
             char_features = self.char_feature.get_last_hiddens(char_inputs, char_seq_lens)
             word_emb = torch.cat([word_emb, char_features], 2)
+        if self.dep_method == DepMethod.feat_emb:
+            # root_emb = self.word_embedding(self.root_idx).view(1, 1, self.embedding_dim).expand(batch_size, 1, self.embedding_dim)
+            # aug_emb = torch.cat([root_emb, word_emb], 1)
+            size = self.embedding_dim if not self.use_char else (self.embedding_dim + self.charlstm_dim)
+            dep_head_emb = torch.gather(word_emb, 1, dep_head_tensor.view(batch_size, sent_len, 1).expand(batch_size, sent_len, size))
+        if self.context_emb != ContextEmb.none:
+            word_emb = torch.cat([word_emb, batch_context_emb.to(self.device)], 2)
         # if self.use_head:
         """
           Word Representation
