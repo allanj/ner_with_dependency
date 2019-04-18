@@ -149,8 +149,9 @@ class NNCRF(nn.Module):
 
         word_emb = self.word_embedding(word_seq_tensor)
         if self.use_char:
-            char_features = self.char_feature.get_last_hiddens(char_inputs, char_seq_lens)
-            word_emb = torch.cat([word_emb, char_features], 2)
+            if self.dep_method == DepMethod.feat_emb:
+                char_features = self.char_feature.get_last_hiddens(char_inputs, char_seq_lens)
+                word_emb = torch.cat([word_emb, char_features], 2)
         if self.dep_method == DepMethod.feat_emb:
             # root_emb = self.word_embedding(self.root_idx).view(1, 1, self.embedding_dim).expand(batch_size, 1, self.embedding_dim)
             # aug_emb = torch.cat([root_emb, word_emb], 1)
@@ -158,6 +159,10 @@ class NNCRF(nn.Module):
             dep_head_emb = torch.gather(word_emb, 1, dep_head_tensor.view(batch_size, sent_len, 1).expand(batch_size, sent_len, size))
         if self.context_emb != ContextEmb.none:
             word_emb = torch.cat([word_emb, batch_context_emb.to(self.device)], 2)
+        if self.use_char:
+            if self.dep_method != DepMethod.feat_emb:
+                char_features = self.char_feature.get_last_hiddens(char_inputs, char_seq_lens)
+                word_emb = torch.cat([word_emb, char_features], 2)
         # if self.use_head:
         """
           Word Representation
