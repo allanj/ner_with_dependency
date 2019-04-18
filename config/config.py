@@ -168,6 +168,8 @@ class Config:
                     # print(tokens)
                     # print(embedding_dim)
                     # assert (embedding_dim + 1 == len(tokens))
+                    if (embedding_dim + 1) != len(tokens):
+                        continue
                     pass
                 embedd = np.empty([1, embedding_dim])
                 embedd[:] = tokens[1:]

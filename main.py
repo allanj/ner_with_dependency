@@ -33,7 +33,7 @@ def parse_arguments(parser):
     parser.add_argument('--device', type=str, default="cpu")
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--digit2zero', action="store_true", default=True)
-    parser.add_argument('--dataset', type=str, default="conll2003")
+    parser.add_argument('--dataset', type=str, default="ontonotes")
     parser.add_argument('--affix', type=str, default="sd")
     parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
     # parser.add_argument('--embedding_file', type=str, default=None)
@@ -249,7 +249,7 @@ def main():
     reader = Reader(conf.digit2zero)
     setSeed(opt, conf.seed)
 
-    trains = reader.read_conll(conf.train_file, conf.train_num, True)
+    trains = reader.read_conll(conf.train_file, -1, True)
     devs = reader.read_conll(conf.dev_file, conf.dev_num, False)
     tests = reader.read_conll(conf.test_file, conf.test_num, False)
     # trains = reader.read_txt(conf.train_file, conf.train_num, True)
@@ -293,6 +293,9 @@ def main():
     print("num words: " + str(len(conf.word2idx)))
     # print(config.word2idx)
     if opt.mode == "train":
+        if conf.train_num != -1:
+            random.shuffle(trains)
+            trains = trains[:conf.train_num]
         learn_from_insts(conf, conf.num_epochs, trains, devs, tests)
     else:
         ## Load the trained model.
