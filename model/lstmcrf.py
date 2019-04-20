@@ -68,7 +68,11 @@ class NNCRF(nn.Module):
         print("[Model Info] Input size to LSTM: {}".format(self.input_size))
         print("[Model Info] LSTM Hidden Size: {}".format(config.hidden_dim))
 
-        self.lstm = nn.LSTM(self.input_size, config.hidden_dim // 2, num_layers=1, batch_first=True, bidirectional=True).to(self.device)
+
+        num_layers = 1
+        if config.num_lstm_layer > 1 and self.dep_method != DepMethod.feat_emb:
+            num_layers = config.num_lstm_layer
+        self.lstm = nn.LSTM(self.input_size, config.hidden_dim // 2, num_layers=num_layers, batch_first=True, bidirectional=True).to(self.device)
 
         self.num_lstm_layer = config.num_lstm_layer
         self.lstm_hidden_dim = config.hidden_dim
