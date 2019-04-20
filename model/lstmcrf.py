@@ -201,7 +201,7 @@ class NNCRF(nn.Module):
         feature_out = self.drop_lstm(lstm_out)
         ### TODO: dropout this lstm output or not, because ABB code do dropout.
 
-        if self.num_lstm_layer > 1:
+        if self.num_lstm_layer > 1 and self.dep_method == DepMethod.feat_emb:
             for l in range(self.num_lstm_layer-1):
                 # root_emb = self.root_linear(root_emb)
                 # aug_feat = torch.cat([root_emb, feature_out], 1)
