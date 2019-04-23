@@ -126,12 +126,11 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
     best_test = [-1, 0]
 
     dep_method_name = config.dep_method.name
-    char_name = "char" if config.use_char_rnn else "nochar"
     if config.dep_method == DepMethod.lstm_lgcn:
         dep_method_name += '(' + str(config.num_gcn_layers) + "," + str(config.gcn_dropout) + "," + str(
             config.gcn_mlp_layers) + ")"
-    model_name = "model_files/{}lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.m".format(char_name, config.num_lstm_layer, config.hidden_dim, config.dataset, config.affix, config.train_num, dep_method_name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, config.num_base, epoch, config.learning_rate)
-    res_name = "results/{}lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.results".format(char_name, config.num_lstm_layer, config.hidden_dim, config.dataset,config.affix, config.train_num, dep_method_name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, config.num_base, epoch, config.learning_rate)
+    model_name = "model_files/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.m".format(config.num_lstm_layer, config.hidden_dim, config.dataset, config.affix, config.train_num, dep_method_name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, config.num_base, epoch, config.learning_rate)
+    res_name = "results/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.results".format(config.num_lstm_layer, config.hidden_dim, config.dataset,config.affix, config.train_num, dep_method_name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, config.num_base, epoch, config.learning_rate)
     print("[Info] The model will be saved to: %s, please ensure models folder exist" % (model_name))
 
     for i in range(1, epoch + 1):
@@ -202,8 +201,7 @@ def test_model(config: Config, test_insts):
     dep_method_name = config.dep_method.name
     if config.dep_method == DepMethod.lstm_lgcn:
         dep_method_name += '(' + str(config.num_gcn_layers) + ","+str(config.gcn_dropout)+ ","+str(config.gcn_mlp_layers)+")"
-    char_name = "char" if config.use_char_rnn else "nochar"
-    model_name = "model_files/{}lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.m".format(char_name, config.num_lstm_layer, config.hidden_dim,
+    model_name = "model_files/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.m".format(config.num_lstm_layer, config.hidden_dim,
                                                                                                    config.dataset, config.affix,
                                                                                                    config.train_num,
                                                                                                    dep_method_name,
@@ -213,7 +211,7 @@ def test_model(config: Config, test_insts):
                                                                                                    config.num_base,
                                                                                                    config.num_epochs,
                                                                                                    config.learning_rate)
-    res_name = "results/{}lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.results".format(char_name, config.num_lstm_layer, config.hidden_dim,
+    res_name = "results/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}.results".format(config.num_lstm_layer, config.hidden_dim,
                                                                                                    config.dataset, config.affix,
                                                                                                    config.train_num,
                                                                                                    dep_method_name,
