@@ -3,7 +3,7 @@ import random
 
 random.seed(42)
 
-file = "/Users/allanjie/allan/data/ner-dataset-modified-dee/20k_mdee_gazz.conll.txt"
+file = "data/galician/gold_nospace_IOB.txt"
 
 
 
@@ -12,12 +12,16 @@ sent = []
 with open(file, 'r', encoding='utf-8') as f:
     for line in tqdm(f.readlines()):
         line = line.rstrip()
-        if line == "":
+        if line.startswith("#"):
+            continue
+        vals = line.split()
+        # print(vals)
+        label = vals[0]
+        word = vals[1]
+        sent.append((word, label))
+        if word == ".":
             sents.append(sent)
             sent = []
-        else:
-            word, label = line.split()
-            sent.append((word, label))
 
 random.shuffle(sents)
 
@@ -30,9 +34,9 @@ num_dev = (len(sents) - num_train) // 2
 num_test =  len(sents)  - num_train - num_dev
 
 
-trainf = "data/indo/train.txt"
-devf = "data/indo/dev.txt"
-testf = "data/indo/test.txt"
+trainf = "data/galician/train.txt"
+devf = "data/galician/dev.txt"
+testf = "data/galician/test.txt"
 
 
 out = open(trainf, 'w', encoding='utf-8')

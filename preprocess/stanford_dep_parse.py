@@ -3,26 +3,21 @@
 
 
 
-import spacy
-from spacy.pipeline import DependencyParser
-from spacy.tokens import Doc
-import tqdm
-
 
 import stanfordnlp
 
-def init():
-    prefix = 'D:/Users/Allan/stanfordnlp_resources/id_gsd_models/'
+def init(lang:str):
+    prefix = 'D:/Users/Allan/stanfordnlp_resources/'+lang+'_models/'
     config = {
         'processors': 'tokenize,mwt,pos,lemma,depparse', # Comma-separated list of processors to use
-        'lang': 'id', # Language code for the language to build the Pipeline in
-        'tokenize_model_path': prefix + 'id_gsd_tokenizer.pt', # Processor-specific arguments are set with keys "{processor_name}_{argument_name}"
-        # 'mwt_model_path': prefix + 'id_gsd_mwt_expander.pt',
-        'pos_model_path': prefix + 'id_gsd_tagger.pt',
-        'pos_pretrain_path': prefix + 'id_gsd.pretrain.pt',
-        'lemma_model_path': prefix + 'id_gsd_lemmatizer.pt',
-        'depparse_model_path': prefix + 'id_gsd_parser.pt',
-        'depparse_pretrain_path': prefix + 'id_gsd.pretrain.pt',
+        'lang': lang[:2], # Language code for the language to build the Pipeline in
+        'tokenize_model_path': prefix + lang + '_tokenizer.pt', # Processor-specific arguments are set with keys "{processor_name}_{argument_name}"
+        'mwt_model_path': prefix + lang + '_mwt_expander.pt',
+        'pos_model_path': prefix + lang + '_tagger.pt',
+        'pos_pretrain_path': prefix + lang + '.pretrain.pt',
+        'lemma_model_path': prefix + lang + '_lemmatizer.pt',
+        'depparse_model_path': prefix + lang + '_parser.pt',
+        'depparse_pretrain_path': prefix + lang + '.pretrain.pt',
         'use_gpu': False,
         'tokenize_pretokenized': True
     }
@@ -73,11 +68,13 @@ def process_txt(model, filename:str, out:str):
 
 
 
-nlp = init()
-process_txt(nlp, "data/indo/train.txt", "data/indo/train.conllx")
-process_txt(nlp, "data/indo/dev.txt", "data/indo/dev.conllx")
-process_txt(nlp, "data/indo/test.txt", "data/indo/test.conllx")
-# model = spacy.load('en_core_web_lg', disable=['ner'])
-# process_wnut(model, "../data/wnut17/wnut17train.conll", "../data/wnut17/train.ud.conllx")
-# process_wnut(model, "../data/wnut17/emerging.dev.conll", "../data/wnut17/dev.ud.conllx")
-# process_wnut(model, "../data/wnut17/emerging.test.annotated", "../data/wnut17/test.ud.conllx")
+lang = 'gl_ctg' ##id: id_gsd
+nlp = init(lang)
+# process_txt(nlp, "data/indo/train.txt", "data/indo/train.conllx")
+# process_txt(nlp, "data/indo/dev.txt", "data/indo/dev.conllx")
+# process_txt(nlp, "data/indo/test.txt", "data/indo/test.conllx")
+
+
+process_txt(nlp, "data/galician/train.txt", "data/galician/train.conllx")
+process_txt(nlp, "data/galician/dev.txt", "data/galician/dev.conllx")
+process_txt(nlp, "data/galician/test.txt", "data/galician/test.conllx")
