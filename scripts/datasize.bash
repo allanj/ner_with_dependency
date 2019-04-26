@@ -37,7 +37,7 @@ nums=(5992 11984 17977 23969 29962 35954 41946 47939 53931)
 
 for (( d=0; d<${#datasets[@]}; d++  )) do
     dataset=${datasets[$d]}
-    for (( n=0; d<${#nums[@]}; n++  )) do
+    for (( n=0; n<${#nums[@]}; n++  )) do
       num=${nums[$n]}
       first_part=logs/hidden_${num_lstm_layer}_${hidden}_${dataset}_${affix}_head_${dep_method}_asfeat_${context_emb}_gcn_${gcn_layer}_${gcn_mlp_layers}_${gcn_dropout}_gate_${gcn_gate}
       logfile=${first_part}_dir_${gcn_adj_directed}_loop_${gcn_adj_selfloop}_base_${num_base}_epoch_${num_epochs}_lr_${lr}_num_${num}.log
