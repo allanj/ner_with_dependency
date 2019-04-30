@@ -12,7 +12,7 @@ def init(lang:str):
         'processors': 'tokenize,mwt,pos,lemma,depparse', # Comma-separated list of processors to use
         'lang': lang[:2], # Language code for the language to build the Pipeline in
         'tokenize_model_path': prefix + lang + '_tokenizer.pt', # Processor-specific arguments are set with keys "{processor_name}_{argument_name}"
-        'mwt_model_path': prefix + lang + '_mwt_expander.pt',
+        # 'mwt_model_path': prefix + lang + '_mwt_expander.pt',
         'pos_model_path': prefix + lang + '_tagger.pt',
         'pos_pretrain_path': prefix + lang + '.pretrain.pt',
         'lemma_model_path': prefix + lang + '_lemmatizer.pt',
@@ -68,13 +68,17 @@ def process_txt(model, filename:str, out:str):
 
 
 
-lang = 'gl_ctg' ##id: id_gsd
+lang = 'af_afribooms' ##id: id_gsd, gl_ctg
 nlp = init(lang)
 # process_txt(nlp, "data/indo/train.txt", "data/indo/train.conllx")
 # process_txt(nlp, "data/indo/dev.txt", "data/indo/dev.conllx")
 # process_txt(nlp, "data/indo/test.txt", "data/indo/test.conllx")
 
 
-process_txt(nlp, "data/galician/train.txt", "data/galician/train.conllx")
-process_txt(nlp, "data/galician/dev.txt", "data/galician/dev.conllx")
-process_txt(nlp, "data/galician/test.txt", "data/galician/test.conllx")
+# process_txt(nlp, "data/galician/train.txt", "data/galician/train.conllx")
+# process_txt(nlp, "data/galician/dev.txt", "data/galician/dev.conllx")
+# process_txt(nlp, "data/galician/test.txt", "data/galician/test.conllx")
+
+process_txt(nlp, "data/af/train.txt", "data/af/train.sd.conllx")
+process_txt(nlp, "data/af/dev.txt", "data/af/dev.sd.conllx")
+process_txt(nlp, "data/af/test.txt", "data/af/test.sd.conllx")
