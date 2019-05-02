@@ -3,10 +3,12 @@
 #
 from typing import List
 
+type2num = {}
+
 def extract(words: List[str], labels:List[str], heads:List[str], deps:List[str]):
     entity_pool = [] ## type, left, right
     completed_pool = []
-    # print(words)
+    print(words)
     # print(labels)
     for i, label in enumerate(labels):
         if label == "_":
@@ -50,7 +52,7 @@ def extract(words: List[str], labels:List[str], heads:List[str], deps:List[str])
             else:
                 raise Exception("not val type {}".format(label))
     assert (len(entity_pool) == 0)
-    pos_spans = []
+
 
     for i in range(len(words)):
         curr_pos = []
@@ -59,21 +61,37 @@ def extract(words: List[str], labels:List[str], heads:List[str], deps:List[str])
             if i >= start and i <= end:
                 curr_pos.append(span)
         curr_pos = sorted(curr_pos, key=lambda span: span[1] - span[0])
-        pos_spans.append()
+        for span in curr_pos[1:]:
+            completed_pool.remove(span)
 
-
-def intersect(cur_spans, new_span):
-    for span in cur_spans:
+    labels = ["O"] * len(words)
+    visited = [False] * len(words)
+    for span in completed_pool:
         start, end, label = span
-        ns, ne, nl = new_span
-        if start == ns or end == ne:
-            return True
 
-    return False
+        for check in visited[start:(end+1)]:
+            if check:
+                raise Exception("this position is checked.")
+
+        if label not in ('person', 'loc', 'org'):
+            label = 'misc'
+
+        labels[start] = "B-"+label
+        labels[(start+1):end] = ["I-" + label] * (end - start)
+        visited[start: (end+1)] = [True] * (end-start + 1)
+
+        if label in type2num:
+            type2num[label] += 1
+        else:
+            type2num[label] = 1
+
+    # print(labels)
+    return labels
 
 
-
-def read_all_sents(filename:str, x = None):
+def read_all_sents(filename:str, out:str):
+    print(filename)
+    fres = open(out, 'w', encoding='utf-8')
     sents = []
     with open(filename, 'r', encoding='utf-8') as f:
         words = []
@@ -87,7 +105,15 @@ def read_all_sents(filename:str, x = None):
                 continue
             if line == "":
                 idx = 1
-                extract(words, labels, heads, deps)
+                labels = extract(words, labels, heads, deps)
+                idx = 1
+                for w, h, dep, label in zip(words, heads, deps, labels):
+                    if dep == "sentence":
+                        dep = "root"
+                    fres.write("{}\t{}\t_\t_\t_\t_\t{}\t{}\t_\t_\t{}\n".format(idx, w, h, dep, label))
+                    idx += 1
+                fres.write('\n')
+
                 words = []
                 heads = []
                 deps = []
@@ -104,6 +130,7 @@ def read_all_sents(filename:str, x = None):
             heads.append(head)
             labels.append(label)
             deps.append(dep_label)
+    fres.close()
 
 def process(filename:str, out:str):
     fres = open(out, 'w', encoding='utf-8')
@@ -175,8 +202,15 @@ def process(filename:str, out:str):
 # process("data/semeval10t1/en.devel.txt", "data/semeval10t1/dev.sd.conllx")
 # process("data/semeval10t1/en.test.txt", "data/semeval10t1/test.sd.conllx")
 
-lang = "es"
+lang = "nl"
 folder="sem" + lang
 read_all_sents("data/"+folder+"/"+lang+".train.txt", "data/"+folder+"/train.sd.conllx")
+print(type2num)
+type2num = {}
 read_all_sents("data/"+folder+"/"+lang+".devel.txt", "data/"+folder+"/dev.sd.conllx")
+
+print(type2num)
+type2num = {}
 read_all_sents("data/"+folder+"/"+lang+".test.txt", "data/"+folder+"/test.sd.conllx")
+
+print(type2num)
