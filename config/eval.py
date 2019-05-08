@@ -14,6 +14,8 @@ class Span:
     def __hash__(self):
         return hash((self.left, self.right, self.type))
 
+    def to_str(self, sent):
+        return str(sent[self.left: (self.right+1)]) + ","+self.type
 
 ## the input to the evaluation should already have
 ## have the predictions which is the label.
