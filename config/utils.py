@@ -132,7 +132,7 @@ def simple_batching(config, insts: List[Instance]):
                 g.edata.update({'rel_type': edge_type, 'norm': edge_norms})
                 graphs.append(g)
                 count = None
-        if config.dep_method == DepMethod.feat_emb  or config.dep_method == DepMethod.feat_head_only:
+        if config.dep_method == DepMethod.feat_emb  or config.dep_method == DepMethod.feat_head_only or  "lgcn" in config.dep_method.name:
             batch_dep_heads = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
             dep_label_tensor = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
         # trees = [inst.tree for inst in batch_data]
@@ -142,7 +142,7 @@ def simple_batching(config, insts: List[Instance]):
         if config.context_emb != ContextEmb.none:
             word_emb_tensor[idx, :word_seq_len[idx], :] = torch.from_numpy(batch_data[idx].elmo_vec)
 
-        if config.dep_method == DepMethod.feat_emb or config.dep_method == DepMethod.feat_head_only:
+        if config.dep_method == DepMethod.feat_emb or config.dep_method == DepMethod.feat_head_only or "lgcn" in config.dep_method.name:
             batch_dep_heads[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].dep_head_ids)
             dep_label_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].dep_label_ids)
         for word_idx in range(word_seq_len[idx]):
@@ -164,7 +164,7 @@ def simple_batching(config, insts: List[Instance]):
             # adjs_out = adjs_out.to(config.device)
             graphs = dgl.batch(graphs)
             # dep_label_adj = dep_label_adj.to(config.device)
-        if config.dep_method == DepMethod.feat_emb  or config.dep_method == DepMethod.feat_head_only:
+        if config.dep_method == DepMethod.feat_emb  or config.dep_method == DepMethod.feat_head_only or  "lgcn" in config.dep_method.name:
             batch_dep_heads = batch_dep_heads.to(config.device)
             dep_label_tensor = dep_label_tensor.to(config.device)
 
@@ -191,7 +191,7 @@ def head_to_adj(max_len, inst, config):
 
     for i, head in enumerate(inst.input.heads):
         if head == -1:
-            continue
+            ret[i , i] = 1
         ret[head, i] = 1
 
     if not directed:

@@ -110,7 +110,7 @@ class NNCRF(nn.Module):
                 self.dep_nn = ChildSumTreeLSTM(config, config.hidden_dim, config.dep_hidden_dim)
                 final_hidden_dim = config.dep_hidden_dim
             elif self.dep_method == DepMethod.lstm_lgcn:
-                self.dep_nn = DepLabeledGCN(config, config.hidden_dim )  ### lstm hidden size
+                self.dep_nn = DepLabeledGCN(config, config.hidden_dim)  ### lstm hidden size
                 final_hidden_dim = config.dep_hidden_dim
             elif self.dep_method == DepMethod.lstm_sgcn:
                 self.dep_nn = SyntacticGCN(config, config.hidden_dim)  ### lstm hidden size
@@ -226,7 +226,8 @@ class NNCRF(nn.Module):
             # feature_out = self.gcn(gcn_input, sorted_seq_len, adj_matrixs[permIdx])
             feature_out = self.dep_nn(feature_out, sorted_seq_len, adj_matrixs[permIdx])
         elif self.dep_method == DepMethod.lstm_lgcn:
-            feature_out = self.dep_nn(feature_out, sorted_seq_len, adj_matrixs[permIdx], dep_label_adj[permIdx])
+            dep_emb = self.dep_label_embedding(dep_label_tensor[permIdx])
+            feature_out = self.dep_nn(feature_out, sorted_seq_len, adj_matrixs[permIdx], dep_emb)
         elif self.dep_method == DepMethod.lstm_sgcn:
             feature_out = self.dep_nn(feature_out, sorted_seq_len, adjs_in[permIdx], adjs_out[permIdx], dep_label_adj[permIdx])
         elif self.dep_method == DepMethod.lstm_rgcn:

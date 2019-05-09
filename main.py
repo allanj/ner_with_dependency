@@ -146,8 +146,8 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
             loss = model.neg_log_obj(batch_word, batch_wordlen, batch_context_emb,batch_char, batch_charlen, adj_matrixs, adjs_in, adjs_out, graphs, dep_label_adj, batch_dep_heads, batch_label, batch_dep_label, trees)
             epoch_loss += loss.item()
             loss.backward()
-            if config.dep_method == DepMethod.lstm_lgcn and config.num_gcn_layers > 1:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), config.clip) ##clipping the gradient
+            # if config.dep_method == DepMethod.lstm_lgcn and config.num_gcn_layers > 1:
+            #     torch.nn.utils.clip_grad_norm_(model.parameters(), config.clip) ##clipping the gradient
             optimizer.step()
             model.zero_grad()
 
