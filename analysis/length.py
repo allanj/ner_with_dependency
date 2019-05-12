@@ -32,7 +32,7 @@ def use_iobes(insts):
                         output[pos] = curr_entity.replace("I-", "E-")
 
 
-dataset = "semes"
+dataset = "ontonotes"
 train = "data/"+dataset+"/train.sd.conllx"
 dev = "data/"+dataset+"/dev.sd.conllx"
 test = "data/"+dataset+"/test.sd.conllx"
