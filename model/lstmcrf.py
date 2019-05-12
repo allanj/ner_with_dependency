@@ -57,6 +57,9 @@ class NNCRF(nn.Module):
         """
         if self.dep_method == DepMethod.feat_head_only:
             self.input_size += config.embedding_dim
+            if self.use_char:
+                self.input_size += config.charlstm_hidden_dim
+                self.charlstm_dim = config.charlstm_hidden_dim
         elif self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.tree_lstm:
             self.input_size += config.embedding_dim + config.dep_emb_size
             if self.use_char:
@@ -70,14 +73,14 @@ class NNCRF(nn.Module):
 
 
         num_layers = 1
-        if config.num_lstm_layer > 1 and self.dep_method != DepMethod.feat_emb:
+        if config.num_lstm_layer > 1 and self.dep_method != DepMethod.feat_emb and self.dep_method != DepMethod.feat_head_only:
             num_layers = config.num_lstm_layer
         self.lstm = nn.LSTM(self.input_size, config.hidden_dim // 2, num_layers=num_layers, batch_first=True, bidirectional=True).to(self.device)
 
         self.num_lstm_layer = config.num_lstm_layer
         self.lstm_hidden_dim = config.hidden_dim
         self.embedding_dim = config.embedding_dim
-        if config.num_lstm_layer > 1 and self.dep_method == DepMethod.feat_emb:
+        if config.num_lstm_layer > 1 and (self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.feat_head_only):
             self.add_lstms = nn.ModuleList()
             hidden_size = 2 * config.hidden_dim
             print("[Model Info] Building {} more LSTMs, with size: {} x {} (without dep label highway connection)".format(config.num_lstm_layer-1, hidden_size, config.hidden_dim))
@@ -153,10 +156,10 @@ class NNCRF(nn.Module):
 
         word_emb = self.word_embedding(word_seq_tensor)
         if self.use_char:
-            if self.dep_method == DepMethod.feat_emb:
+            if self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.feat_head_only:
                 char_features = self.char_feature.get_last_hiddens(char_inputs, char_seq_lens)
                 word_emb = torch.cat([word_emb, char_features], 2)
-        if self.dep_method == DepMethod.feat_emb:
+        if self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.feat_head_only:
             # root_emb = self.word_embedding(self.root_idx).view(1, 1, self.embedding_dim).expand(batch_size, 1, self.embedding_dim)
             # aug_emb = torch.cat([root_emb, word_emb], 1)
             size = self.embedding_dim if not self.use_char else (self.embedding_dim + self.charlstm_dim)
@@ -164,7 +167,7 @@ class NNCRF(nn.Module):
         if self.context_emb != ContextEmb.none:
             word_emb = torch.cat([word_emb, batch_context_emb.to(self.device)], 2)
         if self.use_char:
-            if self.dep_method != DepMethod.feat_emb:
+            if self.dep_method != DepMethod.feat_emb and self.dep_method != DepMethod.feat_head_only:
                 char_features = self.char_feature.get_last_hiddens(char_inputs, char_seq_lens)
                 word_emb = torch.cat([word_emb, char_features], 2)
         # if self.use_head:
@@ -172,7 +175,6 @@ class NNCRF(nn.Module):
           Word Representation
         """
         if self.dep_method == DepMethod.feat_head_only:
-            dep_head_emb = self.word_embedding(dep_head_tensor)
             word_emb = torch.cat([word_emb, dep_head_emb], 2)
         elif self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.tree_lstm:
             # dep_head_emb = self.word_embedding(dep_head_tensor)
@@ -205,7 +207,7 @@ class NNCRF(nn.Module):
         feature_out = self.drop_lstm(lstm_out)
         ### TODO: dropout this lstm output or not, because ABB code do dropout.
 
-        if self.num_lstm_layer > 1 and self.dep_method == DepMethod.feat_emb:
+        if self.num_lstm_layer > 1 and ( self.dep_method == DepMethod.feat_emb  or self.dep_method == DepMethod.feat_head_only):
             for l in range(self.num_lstm_layer-1):
                 # root_emb = self.root_linear(root_emb)
                 # aug_feat = torch.cat([root_emb, feature_out], 1)

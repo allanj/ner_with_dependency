@@ -89,7 +89,7 @@ def process_dutch(filename:str, out:str):
     fres.close()
 
 
-def process_conll2003(filename:str, out:str):
+def process_conllx(model, filename:str, out:str):
     fres = open(out, 'w', encoding='utf-8')
     print(filename)
     with open(filename, 'r', encoding='utf-8') as f:
@@ -99,7 +99,7 @@ def process_conll2003(filename:str, out:str):
         for line in f.readlines():
             line = line.rstrip()
             if line == "":
-                heads, deps = spacy_process(words, tags)
+                heads, deps = spacy_process(model, words, tags)
                 idx = 1
                 for w, tag, h, dep, label in zip(words, tags, heads, deps, labels):
                     if dep == "ROOT":
@@ -178,11 +178,11 @@ def spacy_process(nlp, words, tags=None):
     else:
         return heads, deps, pred_tags
 
-# nlp = spacy.load('en_core_web_lg', disable=['tagger', 'ner'])
-#
-# process_conll2003("../data/conll2003/train.sd.conllx", "../data/conll2003/train.sud.conllx")
-# process_conll2003("../data/conll2003/dev.sd.conllx", "../data/conll2003/dev.sud.conllx")
-# process_conll2003("../data/conll2003/test.sd.conllx", "../data/conll2003/test.sud.conllx")
+nlp = spacy.load('en_core_web_lg', disable=['tagger', 'ner'])
+
+process_conllx(nlp, "../data/ontonotes/train.sd.conllx", "../data/ontonotes/train.sud.conllx")
+process_conllx(nlp, "../data/ontonotes/dev.sd.conllx", "../data/ontonotes/dev.sud.conllx")
+process_conllx(nlp, "../data/ontonotes/test.sd.conllx", "../data/ontonotes/test.sud.conllx")
 
 
 # nlp = spacy.load('es_core_news_md', disable=['ner'])

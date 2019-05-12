@@ -68,10 +68,10 @@ def read_conll(res_file: str, number: int = -1) -> List[Instance]:
     print("number of sentences: {}".format(len(insts)))
     return insts
 
-res1 = "../final_results/lstm_2_200_crf_ontonotes_chinese_sd_-1_dep_feat_emb_elmo_elmo_sgd_gate_0_base_-1_epoch_150_lr_0.01.results"
+res1 = "../final_results/lstm_2_200_crf_ontonotes_sd_-1_dep_feat_emb_elmo_elmo_sgd_gate_0_base_-1_epoch_1000_lr_0.01.results"
 insts1 = read_conll(res1)
 
-res2 = "../final_results/lstm_1_200_crf_ontonotes_chinese_sd_-1_dep_none_elmo_elmo_sgd_gate_0_base_-1_epoch_150_lr_0.01.results"
+res2 = "../final_results/lstm_1_200_crf_ontonotes_sd_-1_dep_feat_emb_elmo_none_sgd_gate_0_base_-1_epoch_150_lr_0.01.results"
 insts2 = read_conll(res2)
 
 print(evaluate(insts1))
@@ -81,6 +81,7 @@ total_entity = 0
 type2num = {}
 length2num = {}
 dep_label2num = {}
+gc2num = {}
 for i in range(len(insts1)):
 
     first = insts1[i]
@@ -90,6 +91,9 @@ for i in range(len(insts1)):
     pred_first = get_spans(first.prediction)
     pred_second = get_spans(second.prediction)
 
+
+    # for span in pred_first:
+    #     if span in gold_spans and (span not in pred_second):
     for span in gold_spans:
         if span in pred_first and (span not in pred_second):
             num += 1
@@ -111,6 +115,13 @@ for i in range(len(insts1)):
                     else:
                         dep_label2num[first.input.dep_labels[k]] = 1
 
+                if first.input.heads[k]!= -1 and first.input.heads[first.input.heads[k]] != -1:
+                    h = first.input.heads[first.input.heads[k]]
+                    if first.input.dep_labels[k] + "," + first.input.dep_labels[h] in gc2num:
+                        gc2num[first.input.dep_labels[k] + "," + first.input.dep_labels[h]] += 1
+                    else:
+                        gc2num[first.input.dep_labels[k] + "," + first.input.dep_labels[h]] = 1
+
         total_entity +=1
 
 print(num, total_entity)
@@ -121,8 +132,13 @@ print(length2num)
 print(dep_label2num)
 total_amount = sum([dep_label2num[key] for key in dep_label2num])
 print(total_amount)
+
 counts = [(key, dep_label2num[key]) for key in dep_label2num]
 counts = sorted(counts, key=lambda vals: vals[1], reverse=True)
 print(counts)
 
 
+print(gc2num)
+counts = [(key, gc2num[key]) for key in gc2num]
+counts = sorted(counts, key=lambda vals: vals[1], reverse=True)
+print(counts)
