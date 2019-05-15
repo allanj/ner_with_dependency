@@ -65,7 +65,7 @@ def simple_batching(config, insts: List[Instance]):
     trees = None
     graphs = None
     if config.dep_method != DepMethod.none:
-        if "lgcn" in config.dep_method.name:
+        if "lgcn" in config.dep_method.name or config.dep_method == DepMethod.lstm_gcn:
             adjs = [ head_to_adj(max_seq_len, inst, config) for inst in batch_data]
             adjs = np.stack(adjs, axis=0)
             adjs = torch.from_numpy(adjs)
@@ -132,7 +132,7 @@ def simple_batching(config, insts: List[Instance]):
                 g.edata.update({'rel_type': edge_type, 'norm': edge_norms})
                 graphs.append(g)
                 count = None
-        if config.dep_method == DepMethod.feat_emb  or config.dep_method == DepMethod.feat_head_only:
+        if config.dep_method == DepMethod.feat_emb  or config.dep_method == DepMethod.feat_head_only or config.dep_method == DepMethod.lstm_gcn:
             batch_dep_heads = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
             dep_label_tensor = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
         # trees = [inst.tree for inst in batch_data]
@@ -142,7 +142,7 @@ def simple_batching(config, insts: List[Instance]):
         if config.context_emb != ContextEmb.none:
             word_emb_tensor[idx, :word_seq_len[idx], :] = torch.from_numpy(batch_data[idx].elmo_vec)
 
-        if config.dep_method == DepMethod.feat_emb or config.dep_method == DepMethod.feat_head_only:
+        if config.dep_method == DepMethod.feat_emb or config.dep_method == DepMethod.feat_head_only or config.dep_method == DepMethod.lstm_gcn:
             batch_dep_heads[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].dep_head_ids)
             dep_label_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].dep_label_ids)
         for word_idx in range(word_seq_len[idx]):
@@ -164,7 +164,7 @@ def simple_batching(config, insts: List[Instance]):
             # adjs_out = adjs_out.to(config.device)
             graphs = dgl.batch(graphs)
             # dep_label_adj = dep_label_adj.to(config.device)
-        if config.dep_method == DepMethod.feat_emb  or config.dep_method == DepMethod.feat_head_only:
+        if config.dep_method == DepMethod.feat_emb  or config.dep_method == DepMethod.feat_head_only or config.dep_method == DepMethod.lstm_gcn:
             batch_dep_heads = batch_dep_heads.to(config.device)
             dep_label_tensor = dep_label_tensor.to(config.device)
 
@@ -235,7 +235,10 @@ def head_to_adj_label(max_len, inst, config):
             continue
         dep_label_ret[head, i] = inst.dep_label_ids[i]
 
-    if not directed:
+        if config.double_dep_label:
+            dep_label_ret[i, head] = config.deplabel2idx[inst.input.dep_labels[i] + "_prime"]
+
+    if not directed and not config.double_dep_label:
         dep_label_ret = dep_label_ret + dep_label_ret.T
 
     if self_loop:

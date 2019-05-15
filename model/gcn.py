@@ -45,6 +45,7 @@ class GCN(nn.Module):
 
         # print(adj_matrix.size())
 
+        adj_matrix = adj_matrix.to(self.device)
         denom = adj_matrix.sum(2).unsqueeze(2) + 1
 
         for l in range(self.layers):

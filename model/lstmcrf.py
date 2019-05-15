@@ -14,6 +14,7 @@ from model.syntactic_gcn import SyntacticGCN
 from model.rgcn import DepRGCN
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from config.config import DepMethod, ContextEmb
+import torch.nn.functional as F
 
 class NNCRF(nn.Module):
 
@@ -26,6 +27,7 @@ class NNCRF(nn.Module):
         self.dep_method = config.dep_method
         # self.use_head = config.use_head
         self.context_emb = config.context_emb
+        self.combine_method = config.combine_method
 
         # if self.dep_method == DepMethod.feat_emb:
         #     self.root_idx = torch.Tensor([config.word2idx[config.ROOT]]).long().to(self.device)
@@ -40,8 +42,7 @@ class NNCRF(nn.Module):
 
 
         self.input_size = config.embedding_dim
-        if self.context_emb != ContextEmb.none:
-            self.input_size += config.context_emb_size
+
         if self.use_char:
             self.char_feature = CharBiLSTM(config)
             self.input_size += config.charlstm_hidden_dim
@@ -52,21 +53,37 @@ class NNCRF(nn.Module):
         self.word_embedding = nn.Embedding.from_pretrained(torch.FloatTensor(config.word_embedding), freeze=False).to(self.device)
         self.word_drop = nn.Dropout(config.dropout).to(self.device)
 
+        if self.dep_method == DepMethod.feat_emb:
+            if self.combine_method == 2 or self.combine_method == 3:
+                self.gcn_linears = nn.ModuleList()
+                for i in range(config.num_lstm_layer - 1):
+                    self.gcn_linears.append(nn.Linear(config.hidden_dim, 2 * config.hidden_dim).to(self.device))
+                if self.combine_method == 3:
+                    self.gcn_head_linears = nn.ModuleList()
+                    for i in range(config.num_lstm_layer - 1):
+                        self.gcn_head_linears.append(nn.Linear(config.hidden_dim, 2 * config.hidden_dim).to(self.device))
         """
             Input size to LSTM description
         """
+        self.charlstm_dim = config.charlstm_hidden_dim
         if self.dep_method == DepMethod.feat_head_only:
             self.input_size += config.embedding_dim
             if self.use_char:
                 self.input_size += config.charlstm_hidden_dim
-                self.charlstm_dim = config.charlstm_hidden_dim
-        elif self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.tree_lstm:
+        elif self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.tree_lstm or self.dep_method == DepMethod.lstm_gcn:
+            # if self.combine_method == 0:
             self.input_size += config.embedding_dim + config.dep_emb_size
             if self.use_char:
                 self.input_size += config.charlstm_hidden_dim
-                self.charlstm_dim = config.charlstm_hidden_dim
+            # elif self.combine_method == 1:
+            #     self.input_size += config.dep_emb_size
+            # elif self.combine_method == 2 or self.combine_method == 3:
+            #     self.input_size = config.dep_hidden_dim + config.dep_emb_size
         elif self.dep_method == DepMethod.label_gcn_lstm or self.dep_method == DepMethod.lgcn_lstm:
             self.input_size = config.dep_hidden_dim ##because gcn first, the input to lstm becomes the hidden size of gcn
+
+        if self.context_emb != ContextEmb.none:
+            self.input_size += config.context_emb_size
 
         print("[Model Info] Input size to LSTM: {}".format(self.input_size))
         print("[Model Info] LSTM Hidden Size: {}".format(config.hidden_dim))
@@ -80,9 +97,13 @@ class NNCRF(nn.Module):
         self.num_lstm_layer = config.num_lstm_layer
         self.lstm_hidden_dim = config.hidden_dim
         self.embedding_dim = config.embedding_dim
-        if config.num_lstm_layer > 1 and (self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.feat_head_only):
+        if config.num_lstm_layer > 1 and (self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.feat_head_only or self.dep_method == DepMethod.lstm_gcn):
             self.add_lstms = nn.ModuleList()
-            hidden_size = 2 * config.hidden_dim
+            if self.combine_method == 0 or self.combine_method == 2 or self.combine_method == 3:
+                hidden_size = 2 * config.hidden_dim
+            elif self.combine_method ==1:
+                hidden_size = config.hidden_dim
+
             print("[Model Info] Building {} more LSTMs, with size: {} x {} (without dep label highway connection)".format(config.num_lstm_layer-1, hidden_size, config.hidden_dim))
             for i in range(config.num_lstm_layer - 1):
                 self.add_lstms.append(nn.LSTM(hidden_size, config.hidden_dim // 2, num_layers=1, batch_first=True, bidirectional=True).to(self.device))
@@ -156,18 +177,20 @@ class NNCRF(nn.Module):
 
         word_emb = self.word_embedding(word_seq_tensor)
         if self.use_char:
-            if self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.feat_head_only:
+            if self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.feat_head_only or self.dep_method == DepMethod.lstm_gcn:
                 char_features = self.char_feature.get_last_hiddens(char_inputs, char_seq_lens)
                 word_emb = torch.cat([word_emb, char_features], 2)
-        if self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.feat_head_only:
+        if self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.feat_head_only or self.dep_method == DepMethod.lstm_gcn:
             # root_emb = self.word_embedding(self.root_idx).view(1, 1, self.embedding_dim).expand(batch_size, 1, self.embedding_dim)
             # aug_emb = torch.cat([root_emb, word_emb], 1)
             size = self.embedding_dim if not self.use_char else (self.embedding_dim + self.charlstm_dim)
             dep_head_emb = torch.gather(word_emb, 1, dep_head_tensor.view(batch_size, sent_len, 1).expand(batch_size, sent_len, size))
+
         if self.context_emb != ContextEmb.none:
             word_emb = torch.cat([word_emb, batch_context_emb.to(self.device)], 2)
+
         if self.use_char:
-            if self.dep_method != DepMethod.feat_emb and self.dep_method != DepMethod.feat_head_only:
+            if self.dep_method != DepMethod.feat_emb and self.dep_method != DepMethod.feat_head_only and self.dep_method != DepMethod.lstm_gcn:
                 char_features = self.char_feature.get_last_hiddens(char_inputs, char_seq_lens)
                 word_emb = torch.cat([word_emb, char_features], 2)
         # if self.use_head:
@@ -176,14 +199,23 @@ class NNCRF(nn.Module):
         """
         if self.dep_method == DepMethod.feat_head_only:
             word_emb = torch.cat([word_emb, dep_head_emb], 2)
-        elif self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.tree_lstm:
+        elif self.dep_method == DepMethod.feat_emb or self.dep_method == DepMethod.tree_lstm  or self.dep_method == DepMethod.lstm_gcn:
             # dep_head_emb = self.word_embedding(dep_head_tensor)
             dep_emb = self.dep_label_embedding(dep_label_tensor)
+            # if self.combine_method == 0:
             word_emb = torch.cat([word_emb, dep_head_emb, dep_emb], 2)
-        # elif self.dep_method == DepMethod.gcn:
-        #     dep_head_emb = self.word_embedding(dep_head_tensor)
-        #     word_emb = torch.cat([word_emb, dep_head_emb], 2)
+            # elif self.combine_method == 1:
+            #     word_emb = word_emb + dep_head_emb
+            #     word_emb = torch.cat([word_emb, dep_emb], 2)
+            # elif self.combine_method == 2:
+            #     word_emb = F.relu(self.gcn_linears[0](word_emb) + self.gcn_linears[0](dep_head_emb))
+            #     word_emb = torch.cat([word_emb, dep_emb], 2)
+            # elif self.combine_method == 3:
+            #     word_emb = F.relu(self.gcn_linears[0](word_emb) + self.gcn_head_linears[0](dep_head_emb))
+            #     word_emb = torch.cat([word_emb, dep_emb], 2)
 
+        # if self.context_emb != ContextEmb.none:
+        #     word_emb = torch.cat([word_emb, batch_context_emb.to(self.device)], 2)
         word_rep = self.word_drop(word_emb)
 
 
@@ -207,13 +239,20 @@ class NNCRF(nn.Module):
         feature_out = self.drop_lstm(lstm_out)
         ### TODO: dropout this lstm output or not, because ABB code do dropout.
 
-        if self.num_lstm_layer > 1 and ( self.dep_method == DepMethod.feat_emb  or self.dep_method == DepMethod.feat_head_only):
+        if self.num_lstm_layer > 1 and ( self.dep_method == DepMethod.feat_emb  or self.dep_method == DepMethod.feat_head_only or self.dep_method == DepMethod.lstm_gcn):
             for l in range(self.num_lstm_layer-1):
                 # root_emb = self.root_linear(root_emb)
                 # aug_feat = torch.cat([root_emb, feature_out], 1)
                 dep_head_emb = torch.gather(feature_out, 1, dep_head_tensor[permIdx].view(batch_size, sent_len, 1).expand(batch_size, sent_len, self.lstm_hidden_dim))
                 # dep_emb = self.dep_label_embedding(dep_label_tensor)
-                feature_out = torch.cat([feature_out, dep_head_emb], 2)
+                if self.combine_method == 0:
+                    feature_out = torch.cat([feature_out, dep_head_emb], 2)
+                elif self.combine_method == 1:
+                    feature_out = feature_out + dep_head_emb
+                elif self.combine_method == 2:
+                    feature_out = F.relu(self.gcn_linears[l](feature_out) + self.gcn_linears[l](dep_head_emb))
+                elif self.combine_method == 3:
+                    feature_out = F.relu(self.gcn_linears[l](feature_out) + self.gcn_head_linears[l](dep_head_emb))
                 packed_words = pack_padded_sequence(feature_out, sorted_seq_len, True)
                 lstm_out, _ = self.add_lstms[l](packed_words, None)
                 lstm_out, _ = pad_packed_sequence(lstm_out, batch_first=True)  ## CARE: make sure here is batch_first, otherwise need to transpose.

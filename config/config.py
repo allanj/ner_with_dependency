@@ -137,7 +137,7 @@ class Config:
         self.eval_epoch = args.eval_epoch
 
 
-
+        self.combine_method = args.comb_method ## 0:concat, 1: addition, 2:gcn
 
 
     # def print(self):
