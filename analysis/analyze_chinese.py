@@ -68,10 +68,10 @@ def read_conll(res_file: str, number: int = -1) -> List[Instance]:
     print("number of sentences: {}".format(len(insts)))
     return insts
 
-res1 = "../final_results/lstm_2_200_crf_ontonotes_sd_-1_dep_feat_emb_elmo_elmo_sgd_gate_0_base_-1_epoch_1000_lr_0.01.results"
+res1 = "../final_results/lstm_3_200_crf_ontonotes_sd_-1_dep_feat_emb_elmo_elmo_sgd_gate_0_base_-1_epoch_200_lr_0.01.results"
 insts1 = read_conll(res1)
 
-res2 = "../final_results/lstm_1_200_crf_ontonotes_sd_-1_dep_feat_emb_elmo_none_sgd_gate_0_base_-1_epoch_150_lr_0.01.results"
+res2 = "../final_results/lstm_2_200_crf_ontonotes_sd_-1_dep_feat_emb_elmo_none_sgd_gate_0_base_-1_epoch_150_lr_0.01.results"
 insts2 = read_conll(res2)
 
 print(evaluate(insts1))
@@ -126,17 +126,18 @@ for i in range(len(insts1)):
 
 print(num, total_entity)
 print(type2num)
-print(length2num)
+print("length 2 number: {}".format(length2num))
 
-
-print(dep_label2num)
+print()
+print("dependency label 2 num: {}".format(dep_label2num))
 total_amount = sum([dep_label2num[key] for key in dep_label2num])
-print(total_amount)
+print("total number of dep 2 num: {}".format(total_amount))
+print()
 
 counts = [(key, dep_label2num[key]) for key in dep_label2num]
 counts = sorted(counts, key=lambda vals: vals[1], reverse=True)
 print(counts)
-
+print()
 
 print(gc2num)
 counts = [(key, gc2num[key]) for key in gc2num]

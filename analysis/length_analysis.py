@@ -173,7 +173,7 @@ def evaluate(insts):
     return f
 
 
-res1 = "./final_results/lstm_2_200_crf_ontonotes_sd_-1_dep_feat_emb_elmo_none_sgd_gate_0_base_-1_epoch_150_lr_0.01.results"
+res1 = "./final_results/lstm_200_crf_ontonotes_sd_-1_dep_lstm_lgcn_elmo_elmo_sgd_gate_0_epoch_100_lr_0.01.results "
 insts1 = read_conll(res1)
 
 res2 = "./final_results/lstm_2_200_crf_ontonotes_sd_-1_dep_none_elmo_none_sgd_gate_0_base_-1_epoch_100_lr_0.01.results"
