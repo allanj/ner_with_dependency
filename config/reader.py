@@ -21,6 +21,7 @@ class Reader:
         insts = []
         num_entity = 0
         # vocab = set() ## build the vocabulary
+        find_root = False
         with open(file, 'r', encoding='utf-8') as f:
             words = []
             heads = []
@@ -36,6 +37,7 @@ class Reader:
                     deps = []
                     labels = []
                     tags = []
+                    find_root = False
                     if len(insts) == number:
                         break
                     continue
@@ -51,6 +53,8 @@ class Reader:
                 if self.digit2zero:
                     word = re.sub('\d', '0', word) # replace digit with 0.
                 words.append(word)
+                if head == 0 and find_root:
+                    raise err("already have a root")
                 heads.append(head - 1) ## because of 0-indexed.
                 deps.append(dep_label)
                 tags.append(pos)

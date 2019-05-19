@@ -54,8 +54,20 @@ for i in range(len(insts)):
         ent_words = ' '.join(inst.input.words[span.left:span.right+1])
         # if ent_words.islower() and span.type != "DATE" and span.type != "ORDINAL" and span.type != "PERCENT"\
         #         and span.type != "CARDINAL" and span.type != "MONEY" and span.type != "QUANTITY" and span.type != "TIME" \
-        #         and span.type != "NORP":
+        #         and span.type != "NORP" and span.type != "PERSON":
         #     print(ent_words + " " + span.type)
-        if span.right - span.left >= 6:
-            print(ent_words + " " + span.type)
+        #     print(inst.input.words)
+        #     print()
+        for k in range(span.left, span.right + 1):
+            head_k = inst.input.heads[k]
+            if abs (head_k - k) >= 4 and span.type != "DATE" and span.type != "ORDINAL" and span.type != "PERCENT" \
+                and ent_words.islower() and span.type != "MONEY" and span.type != "QUANTITY" and span.type != "TIME" and span.type != "CARDINAL" :
+                print(ent_words + " " + span.type)
+                print(inst.input.words)
+                print()
+        # if span.right - span.left >= 4 and span.type != "DATE" and span.type != "ORDINAL" and span.type != "PERCENT" \
+        #         and ent_words.islower() and span.type != "MONEY" and span.type != "QUANTITY" and span.type != "TIME" and span.type != "CARDINAL" :
+        #     print(ent_words + " " + span.type)
+        #     print(inst.input.words)
+        #     print()
     ## book of the dead.

@@ -7,7 +7,8 @@ import spacy
 from spacy.pipeline import DependencyParser
 from spacy.tokens import Doc
 import tqdm
-
+import nltk
+import benepar
 
 def process_conll2002(filename:str, out:str):
     fres = open(out, 'w', encoding='utf-8')
@@ -118,6 +119,34 @@ def process_conllx(model, filename:str, out:str):
             labels.append(label)
     fres.close()
 
+def sa_parse(model, words):
+    tree = model.parse(words)
+    tree_str = str(tree).replace("\n", '')
+    return tree_str
+
+def parse_conllx(model, filename:str, out:str):
+    fres = open(out, 'w', encoding='utf-8')
+    print(filename)
+    with open(filename, 'r', encoding='utf-8') as f:
+        words = []
+        tags = []
+        labels = []
+        for line in f.readlines():
+            line = line.rstrip()
+            if line == "":
+                tree_str = sa_parse(model, words)
+                fres.write(tree_str + '\n')
+                words = []
+                tags = []
+                labels = []
+                continue
+            #1	West	_	NNP	NNP	_	5	compound	_	_	B-MISC
+            idx, word, _, pos , _, _, head, dep_label, _, _, label = line.split()
+            words.append(word)
+            tags.append(pos)
+            labels.append(label)
+    fres.close()
+
 
 def process_wnut(model, filename:str, out:str):
     fres = open(out, 'w', encoding='utf-8')
@@ -178,12 +207,17 @@ def spacy_process(nlp, words, tags=None):
     else:
         return heads, deps, pred_tags
 
-nlp = spacy.load('en_core_web_lg', disable=['tagger', 'ner'])
+# nlp = spacy.load('en_core_web_lg', disable=['tagger', 'ner'])
+#
+# process_conllx(nlp, "../data/ontonotes/train.sd.conllx", "../data/ontonotes/train.sud.conllx")
+# process_conllx(nlp, "../data/ontonotes/dev.sd.conllx", "../data/ontonotes/dev.sud.conllx")
+# process_conllx(nlp, "../data/ontonotes/test.sd.conllx", "../data/ontonotes/test.sud.conllx")
 
-process_conllx(nlp, "../data/ontonotes/train.sd.conllx", "../data/ontonotes/train.sud.conllx")
-process_conllx(nlp, "../data/ontonotes/dev.sd.conllx", "../data/ontonotes/dev.sud.conllx")
-process_conllx(nlp, "../data/ontonotes/test.sd.conllx", "../data/ontonotes/test.sud.conllx")
+parser = benepar.Parser("benepar_en2_large")
 
+parse_conllx(parser, "../data/conll2003/train.sd.conllx", "../data/conll2003/train.parse")
+parse_conllx(parser, "../data/conll2003/dev.sd.conllx", "../data/conll2003/dev.parse")
+parse_conllx(parser, "../data/conll2003/test.sd.conllx", "../data/conll2003/test.parse")
 
 # nlp = spacy.load('es_core_news_md', disable=['ner'])
 #

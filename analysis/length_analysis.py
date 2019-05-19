@@ -132,8 +132,8 @@ def evaluate(insts):
 
         for span in output_spans:
             length = span.right - span.left + 1
-            if length >= 9:
-                length = 9
+            if length >= 6:
+                length = 6
             if length in total_entity:
                 total_entity[length] += 1
             else:
@@ -141,8 +141,8 @@ def evaluate(insts):
 
         for span in predict_spans:
             length = span.right - span.left + 1
-            if length >= 9:
-                length = 9
+            if length >= 6:
+                length = 6
             if length in total_predict:
                 total_predict[length] += 1
             else:
@@ -150,8 +150,8 @@ def evaluate(insts):
 
         for span in predict_spans.intersection(output_spans):
             length = span.right - span.left + 1
-            if length >= 9:
-                length = 9
+            if length >= 6:
+                length = 6
             if length in p:
                 p[length] += 1
             else:
@@ -173,12 +173,52 @@ def evaluate(insts):
     return f
 
 
-res1 = "./final_results/lstm_200_crf_ontonotes_sd_-1_dep_lstm_lgcn_elmo_elmo_sgd_gate_0_epoch_100_lr_0.01.results "
+def grand_child(insts1, insts2):
+    num = 0
+    gc_num = 0
+    ld_num = 0
+    for i in range(len(insts1)):
+
+        first = insts1[i]
+        second = insts2[i]
+        inst = insts1[i]
+        gold_spans = get_spans(first.output)
+
+        pred_first = get_spans(first.prediction)
+        pred_second = get_spans(second.prediction)
+
+        # for span in pred_first:
+        #     if span in gold_spans and (span not in pred_second):
+        for span in gold_spans:
+            if span in pred_first and (span not in pred_second):
+                if span.right - span.left < 2:
+                    continue
+                num += 1
+                # print(span.to_str(first.input.words))
+                has_grand = False
+                has_ld = False
+                for k in range(span.left, span.right + 1):
+                    if inst.input.heads[k] >= span.left and inst.input.heads[k] <= span.right:
+                        head_i = inst.input.heads[k]
+                        if abs(head_i - k) > 1:
+                            has_ld = True
+                        if head_i != -1 and inst.input.heads[head_i] >= span.left and inst.input.heads[
+                            head_i] <= span.right:
+                            has_grand = True
+
+                if has_grand:
+                    gc_num +=1
+                if has_ld:
+                    ld_num += 1
+    return gc_num, ld_num, num
+
+res1 = "./final_results/lstm_3_200_crf_ontonotes_sd_-1_dep_feat_emb_elmo_elmo_sgd_gate_0_base_-1_epoch_200_lr_0.01.results "
 insts1 = read_conll(res1)
 
-res2 = "./final_results/lstm_2_200_crf_ontonotes_sd_-1_dep_none_elmo_none_sgd_gate_0_base_-1_epoch_100_lr_0.01.results"
+res2 = "./final_results/lstm_200_crf_ontonotes_.sd_-1_dep_none_elmo_elmo_sgd_gate_0_epoch_100_lr_0.01.results"
 insts2 = read_conll(res2)
 
 print(evaluate(insts1))
 print(evaluate(insts2))
 
+print(grand_child(insts1, insts2))
