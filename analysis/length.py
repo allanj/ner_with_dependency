@@ -32,10 +32,10 @@ def use_iobes(insts):
                         output[pos] = curr_entity.replace("I-", "E-")
 
 
-dataset = "ontonotes"
-train = "data/"+dataset+"/train.sd.conllx"
-dev = "data/"+dataset+"/dev.sd.conllx"
-test = "data/"+dataset+"/test.sd.conllx"
+dataset = "conll2003"
+train = "../data/"+dataset+"/train.sud.conllx"
+dev = "../data/"+dataset+"/dev.sud.conllx"
+test = "../data/"+dataset+"/test.sud.conllx"
 digit2zero = False
 reader = Reader(digit2zero)
 
@@ -84,6 +84,8 @@ for inst in insts:
             count_grand += 1
         if count_dep == (span.right - span.left):
             count_have_sub += 1
+        else:
+            print(inst.input.words)
 
 
 print(count_have_sub, count_all, count_have_sub/count_all*100)

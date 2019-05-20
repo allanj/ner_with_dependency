@@ -3,7 +3,7 @@ import torch
 from typing import List
 from common.instance import Instance
 import dgl
-
+from config.eval import Span
 
 START = "<START>"
 STOP = "<STOP>"
@@ -246,3 +246,37 @@ def head_to_adj_label(max_len, inst, config):
             dep_label_ret[i, i] = config.root_dep_label_id
 
     return dep_label_ret
+
+
+def get_spans(output):
+    output_spans = set()
+    start = -1
+    for i in range(len(output)):
+        if output[i].startswith("B-"):
+            start = i
+        if output[i].startswith("E-"):
+            end = i
+            output_spans.add(Span(start, end, output[i][2:]))
+        if output[i].startswith("S-"):
+            output_spans.add(Span(i, i, output[i][2:]))
+    return output_spans
+
+def preprocess(conf, insts, file_type:str):
+    print("[Preprocess Info]Doing preprocessing for the CoNLL-2003 dataset: {}.".format(file_type))
+    for inst in insts:
+        output = inst.output
+        spans = get_spans(output)
+        for span in spans:
+            if span.right - span.left + 1 < 2:
+                continue
+            count_dep = 0
+            for i in range(span.left, span.right + 1):
+                if inst.input.heads[i] >= span.left and inst.input.heads[i] <= span.right:
+                    count_dep += 1
+            if count_dep != (span.right - span.left):
+
+                for i in range(span.left, span.right + 1):
+                    if inst.input.heads[i] < span.left or inst.input.heads[i] > span.right:
+                        if i != span.right:
+                            inst.input.heads[i] = span.right
+                            inst.input.dep_labels[i] = "nn" if "sd" in conf.affix else "compound"

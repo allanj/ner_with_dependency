@@ -10,7 +10,7 @@ from model.lstmcrf import NNCRF
 import torch
 import torch.optim as optim
 import torch.nn as nn
-from config.utils import lr_decay, simple_batching
+from config.utils import lr_decay, simple_batching, get_spans, preprocess
 from typing import List
 from common.instance import Instance
 from termcolor import colored
@@ -273,6 +273,12 @@ def main():
     conf.use_iobes(trains)
     conf.use_iobes(devs)
     conf.use_iobes(tests)
+
+    if conf.dataset =="conll2003":
+        preprocess(conf, insts=trains, file_type="train")
+        preprocess(conf, insts=devs, file_type="dev")
+        preprocess(conf, insts=tests, file_type="test")
+
     conf.build_label_idx(trains)
 
     conf.build_deplabel_idx(trains)
