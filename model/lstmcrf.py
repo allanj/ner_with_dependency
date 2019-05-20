@@ -101,7 +101,7 @@ class NNCRF(nn.Module):
             self.add_lstms = nn.ModuleList()
             if self.combine_method == 0 or self.combine_method == 2 or self.combine_method == 3:
                 hidden_size = 2 * config.hidden_dim
-            elif self.combine_method ==1:
+            elif self.combine_method ==1 or self.combine_method == 4:
                 hidden_size = config.hidden_dim
 
             print("[Model Info] Building {} more LSTMs, with size: {} x {} (without dep label highway connection)".format(config.num_lstm_layer-1, hidden_size, config.hidden_dim))
@@ -243,7 +243,8 @@ class NNCRF(nn.Module):
             for l in range(self.num_lstm_layer-1):
                 # root_emb = self.root_linear(root_emb)
                 # aug_feat = torch.cat([root_emb, feature_out], 1)
-                dep_head_emb = torch.gather(feature_out, 1, dep_head_tensor[permIdx].view(batch_size, sent_len, 1).expand(batch_size, sent_len, self.lstm_hidden_dim))
+                if self.combine_method != 4:
+                    dep_head_emb = torch.gather(feature_out, 1, dep_head_tensor[permIdx].view(batch_size, sent_len, 1).expand(batch_size, sent_len, self.lstm_hidden_dim))
                 # dep_emb = self.dep_label_embedding(dep_label_tensor)
                 if self.combine_method == 0:
                     feature_out = torch.cat([feature_out, dep_head_emb], 2)
@@ -253,6 +254,7 @@ class NNCRF(nn.Module):
                     feature_out = F.relu(self.gcn_linears[l](feature_out) + self.gcn_linears[l](dep_head_emb))
                 elif self.combine_method == 3:
                     feature_out = F.relu(self.gcn_linears[l](feature_out) + self.gcn_head_linears[l](dep_head_emb))
+
                 packed_words = pack_padded_sequence(feature_out, sorted_seq_len, True)
                 lstm_out, _ = self.add_lstms[l](packed_words, None)
                 lstm_out, _ = pad_packed_sequence(lstm_out, batch_first=True)  ## CARE: make sure here is batch_first, otherwise need to transpose.
