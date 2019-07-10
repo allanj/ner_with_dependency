@@ -89,7 +89,7 @@ def extract(words: List[str], labels:List[str], heads:List[str], deps:List[str])
     return labels
 
 
-def read_all_sents(filename:str, out:str):
+def read_all_sents(filename:str, out:str, use_gold_dep: bool = True):
     print(filename)
     fres = open(out, 'w', encoding='utf-8')
     sents = []
@@ -123,8 +123,8 @@ def read_all_sents(filename:str, out:str):
             vals = line.split()
             idx = vals[0]
             word = vals[1]
-            head = vals[8]
-            dep_label = vals[10]
+            head = vals[8] if use_gold_dep else vals[9]
+            dep_label = vals[10] if use_gold_dep else vals[11]
             label = vals[12]
             words.append(word)
             heads.append(head)
@@ -202,15 +202,17 @@ def process(filename:str, out:str):
 # process("data/semeval10t1/en.devel.txt", "data/semeval10t1/dev.sd.conllx")
 # process("data/semeval10t1/en.test.txt", "data/semeval10t1/test.sd.conllx")
 
-lang = "nl"
+lang = "ca"
 folder="sem" + lang
-read_all_sents("data/"+folder+"/"+lang+".train.txt", "data/"+folder+"/train.sd.conllx")
+use_gold_dep = False
+affix = "sd" if use_gold_dep else "sud"
+read_all_sents("data/"+folder+"/"+lang+".train.txt", "data/"+folder+"/train."+affix+".conllx", use_gold_dep)
 print(type2num)
 type2num = {}
-read_all_sents("data/"+folder+"/"+lang+".devel.txt", "data/"+folder+"/dev.sd.conllx")
+read_all_sents("data/"+folder+"/"+lang+".devel.txt", "data/"+folder+"/dev."+affix+".conllx", use_gold_dep)
 
 print(type2num)
 type2num = {}
-read_all_sents("data/"+folder+"/"+lang+".test.txt", "data/"+folder+"/test.sd.conllx")
+read_all_sents("data/"+folder+"/"+lang+".test.txt", "data/"+folder+"/test."+affix+".conllx", use_gold_dep)
 
 print(type2num)
