@@ -98,6 +98,7 @@ def read_all_sents(filename:str, out:str):
         heads = []
         deps = []
         labels = []
+        pos_tags = []
         for line in f.readlines():
             line = line.rstrip()
             # print(line)
@@ -107,10 +108,10 @@ def read_all_sents(filename:str, out:str):
                 idx = 1
                 labels = extract(words, labels, heads, deps)
                 idx = 1
-                for w, h, dep, label in zip(words, heads, deps, labels):
+                for w, h, dep, label, pos_tag in zip(words, heads, deps, labels, pos_tags):
                     if dep == "sentence":
                         dep = "root"
-                    fres.write("{}\t{}\t_\t_\t_\t_\t{}\t{}\t_\t_\t{}\n".format(idx, w, h, dep, label))
+                    fres.write("{}\t{}\t_\t{}\t{}\t_\t{}\t{}\t_\t_\t{}\n".format(idx, w, pos_tag, pos_tag, h, dep, label))
                     idx += 1
                 fres.write('\n')
 
@@ -123,10 +124,12 @@ def read_all_sents(filename:str, out:str):
             vals = line.split()
             idx = vals[0]
             word = vals[1]
+            pos_tag = vals[4]
             head = vals[8]
             dep_label = vals[10]
             label = vals[12]
             words.append(word)
+            pos_tags.append(pos_tag)
             heads.append(head)
             labels.append(label)
             deps.append(dep_label)
@@ -202,7 +205,7 @@ def process(filename:str, out:str):
 # process("data/semeval10t1/en.devel.txt", "data/semeval10t1/dev.sd.conllx")
 # process("data/semeval10t1/en.test.txt", "data/semeval10t1/test.sd.conllx")
 
-lang = "nl"
+lang = "ca"
 folder="sem" + lang
 read_all_sents("data/"+folder+"/"+lang+".train.txt", "data/"+folder+"/train.sd.conllx")
 print(type2num)
