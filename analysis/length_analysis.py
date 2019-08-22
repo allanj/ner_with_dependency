@@ -95,7 +95,7 @@ def get_spans(output):
             output_spans.add(Span(i, i, output[i][2:]))
     return output_spans
 
-def evaluate(insts):
+def evaluate(insts, maximum_length = 4):
 
     p = {}
     total_entity = {}
@@ -132,8 +132,8 @@ def evaluate(insts):
 
         for span in output_spans:
             length = span.right - span.left + 1
-            if length >= 6:
-                length = 6
+            if length >= maximum_length:
+                length = maximum_length
             if length in total_entity:
                 total_entity[length] += 1
             else:
@@ -141,8 +141,8 @@ def evaluate(insts):
 
         for span in predict_spans:
             length = span.right - span.left + 1
-            if length >= 6:
-                length = 6
+            if length >= maximum_length:
+                length = maximum_length
             if length in total_predict:
                 total_predict[length] += 1
             else:
@@ -150,8 +150,8 @@ def evaluate(insts):
 
         for span in predict_spans.intersection(output_spans):
             length = span.right - span.left + 1
-            if length >= 6:
-                length = 6
+            if length >= maximum_length:
+                length = maximum_length
             if length in p:
                 p[length] += 1
             else:
@@ -212,13 +212,34 @@ def grand_child(insts1, insts2):
                     ld_num += 1
     return gc_num, ld_num, num
 
-res1 = "./final_results/lstm_3_200_crf_ontonotes_sd_-1_dep_feat_emb_elmo_elmo_sgd_gate_0_base_-1_epoch_200_lr_0.01.results "
+
+## Chinese Comparison
+res1 = "./final_results/lstm_2_200_crf_ontonotes_chinese_sd_-1_dep_none_elmo_elmo_sgd_gate_0_base_-1_epoch_150_lr_0.01.results"
 insts1 = read_conll(res1)
 
-res2 = "./final_results/lstm_200_crf_ontonotes_.sd_-1_dep_none_elmo_elmo_sgd_gate_0_epoch_100_lr_0.01.results"
+res2 = "./final_results/lstm_2_200_crf_ontonotes_chinese_sd_-1_dep_feat_emb_elmo_elmo_sgd_gate_0_base_-1_epoch_100_lr_0.01_doubledep_0_comb_3.results"
 insts2 = read_conll(res2)
 
-print(evaluate(insts1))
-print(evaluate(insts2))
+# Catalan Comparison
+# res1 = "./final_results/lstm_2_200_crf_semca_sd_-1_dep_none_elmo_elmo_sgd_gate_0_base_-1_epoch_150_lr_0.01.results"
+# insts1 = read_conll(res1)
+#
+# res2 = "./final_results/lstm_2_200_crf_semca_sd_-1_dep_feat_emb_elmo_elmo_sgd_gate_0_base_-1_epoch_300_lr_0.01_doubledep_0_comb_3.results"
+# insts2 = read_conll(res2)
+
+
+## Spanish Comparison
+# res1 = "./final_results/lstm_2_200_crf_semes_sd_-1_dep_none_elmo_elmo_sgd_gate_0_base_-1_epoch_150_lr_0.01.results"
+# insts1 = read_conll(res1)
+#
+# res2 = "./final_results/lstm_2_200_crf_semes_sd_-1_dep_feat_emb_elmo_elmo_sgd_gate_0_base_-1_epoch_300_lr_0.01_doubledep_0_comb_3.results"
+# insts2 = read_conll(res2)
+
+
+
+
+maximum_length = 6
+print(evaluate(insts1, maximum_length))
+print(evaluate(insts2, maximum_length))
 
 print(grand_child(insts1, insts2))
