@@ -2,7 +2,6 @@ import numpy as np
 import torch
 from typing import List
 from common.instance import Instance
-import dgl
 from config.eval import Span
 
 START = "<START>"
