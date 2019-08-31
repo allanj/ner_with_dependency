@@ -4,7 +4,7 @@ import random
 import numpy as np
 from config.reader import Reader
 from config import eval
-from config.config import Config, ContextEmb, DepMethod
+from config.config import Config, ContextEmb, DepModelType
 import time
 from model.lstmcrf import NNCRF
 import torch
@@ -69,8 +69,8 @@ def parse_arguments(parser):
     parser.add_argument('--dropout', type=float, default=0.5, help="dropout for embedding")
     parser.add_argument('--use_char_rnn', type=int, default=1, choices=[0, 1], help="use character-level lstm, 0 or 1")
     # parser.add_argument('--use_head', type=int, default=0, choices=[0, 1], help="not use dependency")
-    parser.add_argument('--dep_method', type=str, default="none", help="dependency method")
-    parser.add_argument('--comb_method', type=int, default=0, help="combination method, 0 concat, 1 additon, 2 gcn, 3 more parameter gcn")
+    parser.add_argument('--dep_model', type=str, default="none", choices=["none", "dggcn", "dglstm"], help="dependency method")
+    parser.add_argument('--inter_func', type=str, default="mlp", choices=["concatenation", "addition",  "mlp"], help="combination method, 0 concat, 1 additon, 2 gcn, 3 more parameter gcn")
     parser.add_argument('--context_emb', type=str, default="none", choices=["none", "bert", "elmo", "flair"], help="contextual word embedding")
 
 
@@ -126,12 +126,12 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
     best_dev = [-1, 0]
     best_test = [-1, 0]
 
-    dep_method_name = config.dep_method.name
-    if config.dep_method == DepMethod.lstm_lgcn:
-        dep_method_name += '(' + str(config.num_gcn_layers) + "," + str(config.gcn_dropout) + "," + str(
+    dep_model_name = config.dep_model.name
+    if config.dep_model == DepModelType.dggcn:
+        dep_model_name += '(' + str(config.num_gcn_layers) + "," + str(config.gcn_dropout) + "," + str(
             config.gcn_mlp_layers) + ")"
-    model_name = "model_files/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}_doubledep_{}_comb_{}.m".format(config.num_lstm_layer, config.hidden_dim, config.dataset, config.affix, config.train_num, dep_method_name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, config.num_base, epoch, config.learning_rate, config.double_dep_label, config.combine_method)
-    res_name = "results/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}_doubledep_{}_comb_{}.results".format(config.num_lstm_layer, config.hidden_dim, config.dataset,config.affix, config.train_num, dep_method_name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, config.num_base, epoch, config.learning_rate, config.double_dep_label, config.combine_method)
+    model_name = "model_files/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}_doubledep_{}_comb_{}.m".format(config.num_lstm_layer, config.hidden_dim, config.dataset, config.affix, config.train_num, dep_model_name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, config.num_base, epoch, config.learning_rate, config.double_dep_label, config.interaction_func)
+    res_name = "results/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}_doubledep_{}_comb_{}.results".format(config.num_lstm_layer, config.hidden_dim, config.dataset, config.affix, config.train_num, dep_model_name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, config.num_base, epoch, config.learning_rate, config.double_dep_label, config.interaction_func)
     print("[Info] The model will be saved to: %s, please ensure models folder exist" % (model_name))
 
     for i in range(1, epoch + 1):
@@ -147,7 +147,7 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
             loss = model.neg_log_obj(batch_word, batch_wordlen, batch_context_emb,batch_char, batch_charlen, adj_matrixs, adjs_in, adjs_out, graphs, dep_label_adj, batch_dep_heads, batch_label, batch_dep_label, trees)
             epoch_loss += loss.item()
             loss.backward()
-            if config.dep_method == DepMethod.lstm_lgcn and config.num_gcn_layers > 1:
+            if config.dep_model == DepModelType.dggcn and config.num_gcn_layers > 1:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), config.clip) ##clipping the gradient
             optimizer.step()
             model.zero_grad()
@@ -199,29 +199,29 @@ def evaluate(config:Config, model: NNCRF, batch_insts_ids, name:str, insts: List
 
 
 def test_model(config: Config, test_insts):
-    dep_method_name = config.dep_method.name
-    if config.dep_method == DepMethod.lstm_lgcn:
-        dep_method_name += '(' + str(config.num_gcn_layers) + ","+str(config.gcn_dropout)+ ","+str(config.gcn_mlp_layers)+")"
+    dep_model_name = config.dep_model.name
+    if config.dep_model == DepModelType.dggcn:
+        dep_model_name += '(' + str(config.num_gcn_layers) + ","+str(config.gcn_dropout)+ ","+str(config.gcn_mlp_layers)+")"
     model_name = "model_files/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}_doubledep_{}_comb_{}.m".format(config.num_lstm_layer, config.hidden_dim,
-                                                                                                   config.dataset, config.affix,
-                                                                                                   config.train_num,
-                                                                                                   dep_method_name,
-                                                                                                   config.context_emb.name,
-                                                                                                   config.optimizer.lower(),
-                                                                                                   config.edge_gate,
-                                                                                                   config.num_base,
-                                                                                                   config.num_epochs,
-                                                                                                   config.learning_rate, config.double_dep_label, config.combine_method)
+                                                                                                                                      config.dataset, config.affix,
+                                                                                                                                      config.train_num,
+                                                                                                                                      dep_model_name,
+                                                                                                                                      config.context_emb.name,
+                                                                                                                                      config.optimizer.lower(),
+                                                                                                                                      config.edge_gate,
+                                                                                                                                      config.num_base,
+                                                                                                                                      config.num_epochs,
+                                                                                                                                      config.learning_rate, config.double_dep_label, config.interaction_func)
     res_name = "results/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}_doubledep_{}_comb_{}.results".format(config.num_lstm_layer, config.hidden_dim,
-                                                                                                   config.dataset, config.affix,
-                                                                                                   config.train_num,
-                                                                                                   dep_method_name,
-                                                                                                   config.context_emb.name,
-                                                                                                   config.optimizer.lower(),
-                                                                                                   config.edge_gate,
-                                                                                                   config.num_base,
-                                                                                                   config.num_epochs,
-                                                                                                   config.learning_rate, config.double_dep_label, config.combine_method)
+                                                                                                                                      config.dataset, config.affix,
+                                                                                                                                      config.train_num,
+                                                                                                                                      dep_model_name,
+                                                                                                                                      config.context_emb.name,
+                                                                                                                                      config.optimizer.lower(),
+                                                                                                                                      config.edge_gate,
+                                                                                                                                      config.num_base,
+                                                                                                                                      config.num_epochs,
+                                                                                                                                      config.learning_rate, config.double_dep_label, config.interaction_func)
     model = NNCRF(config)
     model.load_state_dict(torch.load(model_name))
     model.eval()

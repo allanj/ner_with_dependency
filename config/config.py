@@ -12,19 +12,10 @@ from enum import Enum
 from common.tree import Tree
 from termcolor import colored
 
-class DepMethod(Enum):
+class DepModelType(Enum):
     none = 0
-    feat_head_only = 1
-    feat_emb = 2
-    tree_lstm = 3
-    lstm_gcn = 4 ## pure gcn, LSTM -> GCN, not using label embedding.
-    lstm_label_gcn = 5  ## pure gcn, LSTM -> GCN, using label embedding after lstm.
-    label_gcn_lstm = 6
-    lstm_lgcn = 7  ## LSTM to a gcn with dependency labeled
-    lgcn_lstm = 8
-    selfattn=9
-    lstm_sgcn=10
-    lstm_rgcn=11
+    dglstm = 1
+    dggcn = 2
 
 
 class ContextEmb(Enum):
@@ -33,6 +24,11 @@ class ContextEmb(Enum):
     bert = 2
     flair = 3
 
+
+class InteractionFunction(Enum):
+    concatenation = 0
+    addition = 1
+    mlp = 2
 
 
 
@@ -102,7 +98,6 @@ class Config:
         self.dev_num = args.dev_num
         self.test_num = args.test_num
         self.batch_size = args.batch_size
-        self.eval_freq = args.eval_freq
         self.clip = 5
         self.lr_decay = args.lr_decay
         self.device = torch.device(args.device)
@@ -117,7 +112,7 @@ class Config:
         self.charlstm_hidden_dim = 50
         self.use_char_rnn = args.use_char_rnn
         # self.use_head = args.use_head
-        self.dep_method = DepMethod[args.dep_method]
+        self.dep_model = DepModelType[args.dep_model]
 
         self.dep_hidden_dim = args.dep_hidden_dim
         self.num_gcn_layers = args.num_gcn_layers
@@ -137,7 +132,7 @@ class Config:
         self.eval_epoch = args.eval_epoch
 
 
-        self.combine_method = args.comb_method ## 0:concat, 1: addition, 2:gcn
+        self.interaction_func = InteractionFunction[args.inter_func] ## 0:concat, 1: addition, 2:gcn
 
 
     # def print(self):
