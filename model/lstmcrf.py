@@ -97,7 +97,7 @@ class NNCRF(nn.Module):
         Model description
         """
         print("[Model Info] Dep Method: {}, hidden size: {}".format(self.dep_model.name, config.dep_hidden_dim))
-        if self.dep_model != DepModelType.none and self.dep_model != DepModelType.feat_head_only:
+        if self.dep_model != DepModelType.none:
             self.dep_label_embedding = nn.Embedding(len(config.deplabel2idx), config.dep_emb_size).to(self.device)
             if self.dep_model == DepModelType.dggcn:
                 self.gcn = DepLabeledGCN(config, config.hidden_dim)  ### lstm hidden size
