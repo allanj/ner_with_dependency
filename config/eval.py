@@ -1,5 +1,8 @@
 
 import numpy as np
+from typing import List, Tuple, Dict
+
+from collections import defaultdict, Counter
 
 class Span:
 
@@ -62,11 +65,16 @@ def evaluate(insts):
     return [precision, recall, fscore]
 
 
-def evaluate_num(batch_insts, batch_pred_ids, batch_gold_ids, word_seq_lens, idx2label):
+def evaluate_num(batch_insts, batch_pred_ids, batch_gold_ids, word_seq_lens, idx2label) -> Tuple[Dict, Dict, Dict]:
 
-    p = 0
-    total_entity = 0
-    total_predict = 0
+    # p = 0
+    # total_entity = 0
+    # total_predict = 0
+
+    batch_p_dict = defaultdict(int)
+    batch_total_entity_dict = defaultdict(int)
+    batch_total_predict_dict = defaultdict(int)
+
     word_seq_lens = word_seq_lens.tolist()
     for idx in range(len(batch_pred_ids)):
         length = word_seq_lens[idx]
@@ -85,8 +93,10 @@ def evaluate_num(batch_insts, batch_pred_ids, batch_gold_ids, word_seq_lens, idx
             if output[i].startswith("E-"):
                 end = i
                 output_spans.add(Span(start, end, output[i][2:]))
+                batch_total_entity_dict[output[i][2:]] += 1
             if output[i].startswith("S-"):
                 output_spans.add(Span(i, i, output[i][2:]))
+                batch_total_entity_dict[output[i][2:]] += 1
         predict_spans = set()
         for i in range(len(prediction)):
             if prediction[i].startswith("B-"):
@@ -94,15 +104,19 @@ def evaluate_num(batch_insts, batch_pred_ids, batch_gold_ids, word_seq_lens, idx
             if prediction[i].startswith("E-"):
                 end = i
                 predict_spans.add(Span(start, end, prediction[i][2:]))
+                batch_total_predict_dict[prediction[i][2:]] += 1
             if prediction[i].startswith("S-"):
                 predict_spans.add(Span(i, i, prediction[i][2:]))
-
-        total_entity += len(output_spans)
-        total_predict += len(predict_spans)
-        p += len(predict_spans.intersection(output_spans))
-
+                batch_total_predict_dict[prediction[i][2:]] += 1
+        # total_entity += len(output_spans)
+        # total_predict += len(predict_spans)
+        # p += len(predict_spans.intersection(output_spans))
+        correct_spans = predict_spans.intersection(output_spans)
+        for span in correct_spans:
+            batch_p_dict[span.type] += 1
     # precision = p * 1.0 / total_predict * 100 if total_predict != 0 else 0
     # recall = p * 1.0 / total_entity * 100 if total_entity != 0 else 0
     # fscore = 2.0 * precision * recall / (precision + recall) if precision != 0 or recall != 0 else 0
 
-    return np.asarray([p, total_predict, total_entity], dtype=int)
+    # return np.asarray([p, total_predict, total_entity], dtype=int)
+    return Counter(batch_p_dict), Counter(batch_total_predict_dict), Counter(batch_total_entity_dict)
