@@ -14,7 +14,6 @@ from config.utils import lr_decay, simple_batching, get_spans, preprocess
 from typing import List
 from common.instance import Instance
 from termcolor import colored
-import adabound
 
 
 def setSeed(opt, seed):
@@ -90,9 +89,6 @@ def get_optimizer(config: Config, model: nn.Module):
     elif config.optimizer.lower() == "adam":
         print(colored("Using Adam", 'yellow'))
         return optim.Adam(params)
-    elif config.optimizer.lower() == "adabound":
-        print(colored("Using adabound: lr is: {}, final lr is: {}".format(0.001, 0.1), 'yellow'))
-        return adabound.AdaBound(params, lr=1e-3, final_lr=0.1)
     else:
         print("Illegal optimizer: {}".format(config.optimizer))
         exit(1)
@@ -147,7 +143,7 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
             loss = model.neg_log_obj(batch_word, batch_wordlen, batch_context_emb,batch_char, batch_charlen, adj_matrixs, adjs_in, adjs_out, graphs, dep_label_adj, batch_dep_heads, batch_label, batch_dep_label, trees)
             epoch_loss += loss.item()
             loss.backward()
-            if config.dep_model == DepModelType.dggcn and config.num_gcn_layers > 1:
+            if config.dep_model == DepModelType.dggcn:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), config.clip) ##clipping the gradient
             optimizer.step()
             model.zero_grad()
