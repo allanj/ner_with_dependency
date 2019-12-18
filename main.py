@@ -14,6 +14,7 @@ from config.utils import lr_decay, simple_batching, get_spans, preprocess
 from typing import List
 from common.instance import Instance
 from termcolor import colored
+import os
 
 
 def setSeed(opt, seed):
@@ -129,6 +130,10 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
     model_name = "model_files/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}_comb_{}.m".format(config.num_lstm_layer, config.hidden_dim, config.dataset, config.affix, config.train_num, dep_model_name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, epoch, config.learning_rate, config.interaction_func)
     res_name = "results/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}_comb_{}.results".format(config.num_lstm_layer, config.hidden_dim, config.dataset, config.affix, config.train_num, dep_model_name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, epoch, config.learning_rate, config.interaction_func)
     print("[Info] The model will be saved to: %s, please ensure models folder exist" % (model_name))
+    if not os.path.exists("model_files"):
+        os.makedirs("model_files")
+    if not os.path.exists("results"):
+        os.makedirs("results")
 
     for i in range(1, epoch + 1):
         epoch_loss = 0
