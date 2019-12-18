@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 import random
 from config.eval import evaluate, Span
 
+from collections import defaultdict
+
 
 
 def use_iobes(insts):
@@ -32,10 +34,10 @@ def use_iobes(insts):
                         output[pos] = curr_entity.replace("I-", "E-")
 
 
-dataset = "conll2003"
-train = "../data/"+dataset+"/train.sud.conllx"
-dev = "../data/"+dataset+"/dev.sud.conllx"
-test = "../data/"+dataset+"/test.sud.conllx"
+dataset = "ontonotes_chinese"
+train = "../data/"+dataset+"/train.sd.conllx"
+dev = "../data/"+dataset+"/dev.sd.conllx"
+test = "../data/"+dataset+"/test.sd.conllx"
 digit2zero = False
 reader = Reader(digit2zero)
 
@@ -62,11 +64,13 @@ def get_spans(output):
 count_all = 0
 count_have_sub = 0
 count_grand = 0
+length2num = defaultdict(int)
 for inst in insts:
     output = inst.output
     spans = get_spans(output)
     # print(spans)
     for span in spans:
+        length2num[span.right - span.left + 1] += 1
         if span.right - span.left + 1 < L:
             continue
         count_dep = 0
@@ -85,9 +89,11 @@ for inst in insts:
         if count_dep == (span.right - span.left):
             count_have_sub += 1
         else:
-            print(inst.input.words)
+            pass
+            # print(inst.input.words)
 
 
 print(count_have_sub, count_all, count_have_sub/count_all*100)
 print(count_grand, count_all, count_grand/count_all*100)
+print(length2num)
 

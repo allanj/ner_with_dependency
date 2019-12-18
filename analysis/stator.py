@@ -3,8 +3,9 @@
 #
 
 from config.reader import Reader
+from collections import defaultdict
 
-file = "data/ontonotes/train.sd.conllx"
+file = "../data/ontonotes/dev.sd.conllx"
 digit2zero = False
 reader = Reader(digit2zero)
 
@@ -19,6 +20,8 @@ out_doubledep2num = {}
 out_word2num = {}
 
 label2idx = {}
+
+ent2num = defaultdict(int)
 
 def not_entity(label:str):
     if label.startswith("B-") or label.startswith("I-"):
@@ -35,6 +38,9 @@ for inst in insts:
     sent = inst.input
 
     for idx, (word, head_idx, ent, dep) in enumerate(zip(sent.words, sent.heads, output, sent.dep_labels)):
+        if ent.startswith('B-'):
+            ent2num[ent[2:]] += 1
+
         if dep not in label2idx:
             label2idx[dep] = len(label2idx)
         if is_entity(ent):
@@ -76,3 +82,7 @@ counts = sorted(counts, key=lambda vals: vals[1], reverse=True)
 total_ent_dep = sum([nums[1] for nums in counts])
 print(counts)
 print("total is {}".format(total_ent_dep))
+
+
+
+print(f"entity2number: {ent2num}")
