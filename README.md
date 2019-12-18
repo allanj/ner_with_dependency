@@ -43,7 +43,7 @@ python main.py --dataset ontonotes --embedding_file data/glove.6B.100d.txt \
 Change the interaction function `inter_func = concatenation, addition, mlp` for other interactions.  
 
 
-##### Usage for other datasets and other languages
+### Usage for other datasets and other languages
 Remember to put the dataset under the data folder. The naming rule for `train/dev/test` is `train.sd.conllx`, `dev.sd.conllx` and `test.sd.conllx`.
 Then simply change the `--dataset` name and `--embedding_file`. 
 
@@ -56,7 +56,7 @@ Spanish | cc.es.300.vec (FastText)
 
 
 
-##### Using ELMo
+### Using ELMo
 In any case, once we have obtained the pretrained ELMo vector files ready.
 For example, download the `Catalan ELMo` vectors from [here](https://drive.google.com/open?id=1bGCRy4pYDWBcEae5sTSIcdu6PwWgz7Kn), decompressed all the files (`train.conllx.elmo.vec`,`dev.conllx.elmo.vec`, `test.conllx.elmo.vec`) into `data/catalan/`.
 We can then simply run the command below (we take the **DGLSTM-CRF** for example)
@@ -65,7 +65,7 @@ python main.py --dataset ontonotes --embedding_file data/glove.6B.100d.txt \
                --num_lstm_layer 1 --dep_model dglstm --inter_func mlp \
                --context_emb elmo
 ```
-###### Obtain ELMo vectors for other languages:
+### Obtain ELMo vectors for other languages:
 We use the ELMo from AllenNLP for English, and use [ELMoForManyLangs](https://github.com/HIT-SCIR/ELMoForManyLangs) for other languages.
 * English, run the `preprocess/preelmo.py` code (remember to change the `dataset` name)
   ```bash
