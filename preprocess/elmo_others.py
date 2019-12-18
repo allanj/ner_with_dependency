@@ -52,25 +52,11 @@ def read_parse_write(elmo, in_file, out_file):
     f.close()
 
 
+## NOTE: Remember to download the model and change the path here
+elmo = Embedder('/data/allan/embeddings/Spanish_ELMo', batch_size=1)
 
-elmo = Embedder('/data/allan/embeddings/Indonesian_ELMo', batch_size=1)
-# /data/allan/embeddings/Spanish_ELMo/
+dataset = "spanish"
+read_parse_write(elmo, f"data/{dataset}/train.sd.conllx", f"data/{dataset}/train.conllx.elmo.vec")
+read_parse_write(elmo, f"data/{dataset}/dev.sd.conllx", f"data/{dataset}/dev.conllx.elmo.vec")
+read_parse_write(elmo, f"data/{dataset}/test.sd.conllx", f"data/{dataset}/test.conllx.elmo.vec")
 
-
-read_parse_write(elmo, "data/indo/train.sd.conllx", "data/indo/train.conllx.elmo.vec")
-read_parse_write(elmo, "data/indo/dev.sd.conllx", "data/indo/dev.conllx.elmo.vec")
-read_parse_write(elmo, "data/indo/test.sd.conllx", "data/indo/test.conllx.elmo.vec")
-
-# sents = read_conll2002("../data/conll2002/train.txt")
-# sents = [['我', '在', '中国']]
-# result = context_emb(elmo, sents)
-# print("something")
-
-
-# sents = read_conll2002("../data/conll2002/dev.txt")
-# # sents = [['multinacional', 'española', 'Telefónica']]
-# context_emb(emb, sents)
-#
-# sents = read_conll2002("../data/conll2002/test.txt")
-# # sents = [['multinacional', 'española', 'Telefónica']]
-# context_emb(emb, sents)

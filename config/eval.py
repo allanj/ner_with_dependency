@@ -1,6 +1,8 @@
 
 import numpy as np
+from typing import Tuple
 
+from collections import defaultdict
 class Span:
 
     def __init__(self, left, right, type):
@@ -26,6 +28,10 @@ def evaluate(insts):
     total_entity = 0
     total_predict = 0
 
+    batch_p_dict = defaultdict(int)
+    batch_total_entity_dict = defaultdict(int)
+    batch_total_predict_dict = defaultdict(int)
+
     for inst in insts:
 
         output = inst.output
@@ -39,8 +45,11 @@ def evaluate(insts):
             if output[i].startswith("E-"):
                 end = i
                 output_spans.add(Span(start, end, output[i][2:]))
+                batch_total_entity_dict[output[i][2:]] += 1
             if output[i].startswith("S-"):
                 output_spans.add(Span(i, i, output[i][2:]))
+                batch_total_entity_dict[output[i][2:]] += 1
+        start = -1
         predict_spans = set()
         for i in range(len(prediction)):
             if prediction[i].startswith("B-"):
@@ -48,12 +57,21 @@ def evaluate(insts):
             if prediction[i].startswith("E-"):
                 end = i
                 predict_spans.add(Span(start, end, prediction[i][2:]))
+                batch_total_predict_dict[prediction[i][2:]] += 1
             if prediction[i].startswith("S-"):
                 predict_spans.add(Span(i, i, prediction[i][2:]))
+                batch_total_predict_dict[prediction[i][2:]] += 1
 
         total_entity += len(output_spans)
         total_predict += len(predict_spans)
-        p += len(predict_spans.intersection(output_spans))
+        correct_spans = predict_spans.intersection(output_spans)
+        p += len(correct_spans)
+        for span in correct_spans:
+            batch_p_dict[span.type] += 1
+
+    for key in batch_total_entity_dict:
+        precision_key, recall_key, fscore_key = get_metric(batch_p_dict[key], batch_total_entity_dict[key], batch_total_predict_dict[key])
+        print("[%s] Prec.: %.2f, Rec.: %.2f, F1: %.2f" % (key, precision_key, recall_key, fscore_key))
 
     precision = p * 1.0 / total_predict * 100 if total_predict != 0 else 0
     recall = p * 1.0 / total_entity * 100 if total_entity != 0 else 0
@@ -61,6 +79,19 @@ def evaluate(insts):
 
     return [precision, recall, fscore]
 
+def get_metric(p_num: int, total_num: int, total_predicted_num: int) -> Tuple[float, float, float]:
+    """
+    Return the metrics of precision, recall and f-score, based on the number
+    (We make this small piece of function in order to reduce the code effort and less possible to have typo error)
+    :param p_num:
+    :param total_num:
+    :param total_predicted_num:
+    :return:
+    """
+    precision = p_num * 1.0 / total_predicted_num * 100 if total_predicted_num != 0 else 0
+    recall = p_num * 1.0 / total_num * 100 if total_num != 0 else 0
+    fscore = 2.0 * precision * recall / (precision + recall) if precision != 0 or recall != 0 else 0
+    return precision, recall, fscore
 
 def evaluate_num(batch_insts, batch_pred_ids, batch_gold_ids, word_seq_lens, idx2label):
 

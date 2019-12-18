@@ -41,7 +41,7 @@ def read_parse_write(elmo, infile, outfile, mode):
 
 elmo = load_elmo()
 mode= "average"
-dataset="all"
+dataset="ontonotes"
 dep = ""
 file = "../data/"+dataset+"/train"+dep+".conllx"
 outfile = file + ".elmo."+mode+".vec"
