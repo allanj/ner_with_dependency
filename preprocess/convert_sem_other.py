@@ -201,9 +201,7 @@ def process(filename:str, out:str):
 
 
 
-# process("data/semeval10t1/en.train.txt", "data/semeval10t1/train.sd.conllx")
-# process("data/semeval10t1/en.devel.txt", "data/semeval10t1/dev.sd.conllx")
-# process("data/semeval10t1/en.test.txt", "data/semeval10t1/test.sd.conllx")
+### This file is used to convert the semeval Catalan and Spanish into our conllx format
 
 lang = "ca"
 folder="sem" + lang

@@ -9,7 +9,6 @@ from common.instance import Instance
 from config.utils import PAD, START, STOP, ROOT, ROOT_DEP_LABEL, SELF_DEP_LABEL
 import torch
 from enum import Enum
-from common.tree import Tree
 from termcolor import colored
 
 class DepModelType(Enum):
@@ -62,23 +61,11 @@ class Config:
         self.digit2zero = args.digit2zero
 
         self.dataset = args.dataset
-        # self.train_file = "data/" + self.dataset + "/train.txt"
-        # self.dev_file = "data/" + self.dataset + "/dev.txt"
-        # ## following datasets do not have development set
-        # if self.dataset in ("abc", "cnn", "mnb", "nbc", "p25", "pri", "voa"):
-        #     self.dev_file = "data/" + self.dataset + "/test.conllx"
-        # self.test_file = "data/" + self.dataset + "/test.txt"
 
         self.affix = args.affix
-        # if self.dataset == "all":
-        #     self.affix = ""
         train_affix = self.affix.replace("pred", "") if "pred" in self.affix else self.affix
         self.train_file = "data/" + self.dataset + "/train."+train_affix+".conllx"
-
         self.dev_file = "data/" + self.dataset + "/dev."+train_affix+".conllx"
-        ## following datasets do not have development set
-        if self.dataset in ("abc", "cnn", "mnb", "nbc", "p25", "pri", "voa"):
-            self.dev_file = "data/" + self.dataset + "/test."+self.affix+".conllx"
         self.test_file = "data/" + self.dataset + "/test."+self.affix+".conllx"
         self.label2idx = {}
         self.idx2labels = []
@@ -104,7 +91,6 @@ class Config:
 
         self.hidden_dim = args.hidden_dim
         self.num_lstm_layer = args.num_lstm_layer
-        # self.tanh_hidden_dim = args.tanh_hidden_dim
         self.use_brnn = True
         self.num_layers = 1
         self.dropout = args.dropout
@@ -121,8 +107,6 @@ class Config:
         self.adj_directed = args.gcn_adj_directed
         self.adj_self_loop = args.gcn_adj_selfloop
         self.edge_gate = args.gcn_gate
-        self.double_dep_label = args.dep_double_label
-        self.num_base = args.num_base
 
         self.dep_emb_size = args.dep_emb_size
         self.deplabel2idx = {}
@@ -244,10 +228,6 @@ class Config:
                 if label not in self.deplabels:
                     self.deplabels.append(label)
                     self.deplabel2idx[label] = len(self.deplabel2idx)
-                    if self.double_dep_label:
-                        label = label + "_prime"
-                        self.deplabels.append(label) # thus, the id of prime label must be incremented by one as the original label
-                        self.deplabel2idx[label] = len(self.deplabel2idx)
         self.root_dep_label_id = self.deplabel2idx[self.root_dep_label]
 
     def build_label_idx(self, insts):
@@ -309,60 +289,12 @@ class Config:
                 inst.char_ids.append(char_id)
             for i, head in enumerate(inst.input.heads):
                 if head == -1:
-                    # inst.dep_head_ids.append(self.word2idx[self.ROOT])
                     inst.dep_head_ids.append(i) ## appended it self.
                 else:
                     inst.dep_head_ids.append(head)
-                    # word = inst.input.words[head]
-                    # if word in self.word2idx:
-                    #     inst.dep_head_ids.append(self.word2idx[word])
-                    # else:
-                    #     inst.dep_head_ids.append(self.word2idx[self.UNK])
-            # inst.dep_head_ids = inst.input.heads
             for label in inst.input.dep_labels:
                 inst.dep_label_ids.append(self.deplabel2idx[label])
             for label in inst.output:
                 inst.output_ids.append(self.label2idx[label])
             insts_ids.append([inst.word_ids, inst.char_ids, inst.output_ids])
         return insts_ids
-
-    def build_trees(self, insts: List[Instance]):
-        for inst in insts:
-            nodes = [Tree(pos) for pos in range(len(inst.input.words))]
-            root = Tree(-1)
-            for pos, head in enumerate(inst.input.heads):
-                if head != -1:
-                    nodes[head].add_child(nodes[pos])
-                else:
-                    root.add_child(nodes[pos])
-            inst.nodes = nodes
-            for node in nodes:
-                node.sort_children()
-            inst.tree = root.children[0] ## the first root in the dependency tree.
-
-
-    def find_singleton(self, train_insts):
-        freq = {}
-        self.singleton = set()
-        for inst in train_insts:
-            words = inst.input.words
-            for w in words:
-                if w in freq:
-                    freq[w] += 1
-                else:
-                    freq[w] = 1
-        for w in freq:
-            if freq[w] == 1:
-                self.singleton.add(self.word2idx[w])
-
-    def insert_singletons(self, words, p=0.5):
-        """
-        Replace singletons by the unknown word with a probability p.
-        """
-        new_words = []
-        for word in words:
-            if word in self.singleton and np.random.uniform() < p:
-                new_words.append(self.unk_id)
-            else:
-                new_words.append(word)
-        return new_words

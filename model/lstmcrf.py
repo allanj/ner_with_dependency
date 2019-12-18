@@ -98,6 +98,7 @@ class NNCRF(nn.Module):
         """
         print("[Model Info] Dep Method: {}, hidden size: {}".format(self.dep_model.name, config.dep_hidden_dim))
         if self.dep_model != DepModelType.none:
+            print("Initializing the dependency label embedding")
             self.dep_label_embedding = nn.Embedding(len(config.deplabel2idx), config.dep_emb_size).to(self.device)
             if self.dep_model == DepModelType.dggcn:
                 self.gcn = DepLabeledGCN(config, config.hidden_dim)  ### lstm hidden size

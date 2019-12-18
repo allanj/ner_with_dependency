@@ -50,19 +50,19 @@ def parse_arguments(parser):
     parser.add_argument('--eval_freq', type=int, default=4000, help="evaluate frequency (iteration)")
     parser.add_argument('--eval_epoch', type=int, default=0, help="evaluate the dev set after this number of epoch")
 
-    ##model hyperparameter
+    ## model hyperparameter
     parser.add_argument('--hidden_dim', type=int, default=200, help="hidden size of the LSTM")
     parser.add_argument('--num_lstm_layer', type=int, default=1, help="number of lstm layers")
     parser.add_argument('--dep_emb_size', type=int, default=50, help="embedding size of dependency")
     parser.add_argument('--dep_hidden_dim', type=int, default=200, help="hidden size of gcn, tree lstm")
+
+    ### NOTE: GCN parameters, useless if we are not using GCN
     parser.add_argument('--num_gcn_layers', type=int, default=1, help="number of gcn layers")
     parser.add_argument('--gcn_mlp_layers', type=int, default=1, help="number of mlp layers after gcn")
     parser.add_argument('--gcn_dropout', type=float, default=0.5, help="GCN dropout")
     parser.add_argument('--gcn_adj_directed', type=int, default=0, choices=[0, 1], help="GCN ajacent matrix directed")
     parser.add_argument('--gcn_adj_selfloop', type=int, default=0, choices=[0, 1], help="GCN selfloop in adjacent matrix, now always false as add it in the model")
     parser.add_argument('--gcn_gate', type=int, default=0, choices=[0, 1], help="add edge_wise gating")
-    parser.add_argument('--num_base', type=int, default=-1, help="number of bases in rgcn")
-    parser.add_argument('--dep_double_label', type=int, default=0, choices=[0, 1], help="double the dependency labels with direction.")
 
     ##NOTE: this dropout applies to many places
     parser.add_argument('--dropout', type=float, default=0.5, help="dropout for embedding")
@@ -126,8 +126,8 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
     if config.dep_model == DepModelType.dggcn:
         dep_model_name += '(' + str(config.num_gcn_layers) + "," + str(config.gcn_dropout) + "," + str(
             config.gcn_mlp_layers) + ")"
-    model_name = "model_files/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}_doubledep_{}_comb_{}.m".format(config.num_lstm_layer, config.hidden_dim, config.dataset, config.affix, config.train_num, dep_model_name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, config.num_base, epoch, config.learning_rate, config.double_dep_label, config.interaction_func)
-    res_name = "results/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}_doubledep_{}_comb_{}.results".format(config.num_lstm_layer, config.hidden_dim, config.dataset, config.affix, config.train_num, dep_model_name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, config.num_base, epoch, config.learning_rate, config.double_dep_label, config.interaction_func)
+    model_name = "model_files/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}_comb_{}.m".format(config.num_lstm_layer, config.hidden_dim, config.dataset, config.affix, config.train_num, dep_model_name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, epoch, config.learning_rate, config.interaction_func)
+    res_name = "results/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}_comb_{}.results".format(config.num_lstm_layer, config.hidden_dim, config.dataset, config.affix, config.train_num, dep_model_name, config.context_emb.name, config.optimizer.lower(), config.edge_gate, epoch, config.learning_rate, config.interaction_func)
     print("[Info] The model will be saved to: %s, please ensure models folder exist" % (model_name))
 
     for i in range(1, epoch + 1):
@@ -198,26 +198,24 @@ def test_model(config: Config, test_insts):
     dep_model_name = config.dep_model.name
     if config.dep_model == DepModelType.dggcn:
         dep_model_name += '(' + str(config.num_gcn_layers) + ","+str(config.gcn_dropout)+ ","+str(config.gcn_mlp_layers)+")"
-    model_name = "model_files/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}_doubledep_{}_comb_{}.m".format(config.num_lstm_layer, config.hidden_dim,
+    model_name = "model_files/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}_comb_{}.m".format(config.num_lstm_layer, config.hidden_dim,
                                                                                                                                       config.dataset, config.affix,
                                                                                                                                       config.train_num,
                                                                                                                                       dep_model_name,
                                                                                                                                       config.context_emb.name,
                                                                                                                                       config.optimizer.lower(),
                                                                                                                                       config.edge_gate,
-                                                                                                                                      config.num_base,
                                                                                                                                       config.num_epochs,
-                                                                                                                                      config.learning_rate, config.double_dep_label, config.interaction_func)
-    res_name = "results/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_base_{}_epoch_{}_lr_{}_doubledep_{}_comb_{}.results".format(config.num_lstm_layer, config.hidden_dim,
+                                                                                                                                      config.learning_rate, config.interaction_func)
+    res_name = "results/lstm_{}_{}_crf_{}_{}_{}_dep_{}_elmo_{}_{}_gate_{}_epoch_{}_lr_{}_comb_{}.results".format(config.num_lstm_layer, config.hidden_dim,
                                                                                                                                       config.dataset, config.affix,
                                                                                                                                       config.train_num,
                                                                                                                                       dep_model_name,
                                                                                                                                       config.context_emb.name,
                                                                                                                                       config.optimizer.lower(),
                                                                                                                                       config.edge_gate,
-                                                                                                                                      config.num_base,
                                                                                                                                       config.num_epochs,
-                                                                                                                                      config.learning_rate, config.double_dep_label, config.interaction_func)
+                                                                                                                                      config.learning_rate, config.interaction_func)
     model = NNCRF(config)
     model.load_state_dict(torch.load(model_name))
     model.eval()
@@ -246,7 +244,7 @@ def write_results(filename:str, insts):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="LSTM CRF implementation")
+    parser = argparse.ArgumentParser(description="Dependency-Guided LSTM CRF implementation")
     opt = parse_arguments(parser)
     conf = Config(opt)
 
@@ -256,45 +254,24 @@ def main():
     trains = reader.read_conll(conf.train_file, -1, True)
     devs = reader.read_conll(conf.dev_file, conf.dev_num, False)
     tests = reader.read_conll(conf.test_file, conf.test_num, False)
-    # trains = reader.read_txt(conf.train_file, conf.train_num, True)
-    # devs = reader.read_txt(conf.dev_file, conf.dev_num, False)
-    # tests = reader.read_txt(conf.test_file, conf.test_num, False)
-    # print(trains[-1].input.words)
 
     if conf.context_emb != ContextEmb.none:
         print('Loading the {} vectors for all datasets.'.format(conf.context_emb.name))
         conf.context_emb_size = reader.load_elmo_vec(conf.train_file.replace(".sd", "").replace(".ud", "").replace(".sud", "").replace(".predsd", "").replace(".predud", "").replace(".stud", "").replace(".ssd", "") + "."+conf.context_emb.name+".vec", trains)
         reader.load_elmo_vec(conf.dev_file.replace(".sd", "").replace(".ud", "").replace(".sud", "").replace(".predsd", "").replace(".predud", "").replace(".stud", "").replace(".ssd", "")  + "."+conf.context_emb.name+".vec", devs)
         reader.load_elmo_vec(conf.test_file.replace(".sd", "").replace(".ud", "").replace(".sud", "").replace(".predsd", "").replace(".predud", "").replace(".stud", "").replace(".ssd", "")  + "."+conf.context_emb.name+".vec", tests)
-    conf.use_iobes(trains)
-    conf.use_iobes(devs)
-    conf.use_iobes(tests)
 
-    if conf.dataset =="conll2003":
-        preprocess(conf, insts=trains, file_type="train")
-        preprocess(conf, insts=devs, file_type="dev")
-        preprocess(conf, insts=tests, file_type="test")
-
+    conf.use_iobes(trains + devs + tests)
     conf.build_label_idx(trains)
 
-    conf.build_deplabel_idx(trains)
-    conf.build_deplabel_idx(devs)
-    conf.build_deplabel_idx(tests)
+    conf.build_deplabel_idx(trains + devs + tests)
     print("# deplabels: ", len(conf.deplabels))
     print("dep label 2idx: ", conf.deplabel2idx)
-
-    # conf.build_trees(trains)
-    # conf.build_trees(devs)
-    # conf.build_trees(tests)
 
 
     conf.build_word_idx(trains, devs, tests)
     conf.build_emb_table()
-
-    conf.find_singleton(trains)
-    ids_train = conf.map_insts_ids(trains)
-    ids_dev = conf.map_insts_ids(devs)
-    ids_test= conf.map_insts_ids(tests)
+    conf.map_insts_ids(trains + devs + tests)
 
 
     print("num chars: " + str(conf.num_char))

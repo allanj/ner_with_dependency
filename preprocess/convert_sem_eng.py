@@ -2,6 +2,8 @@
 # @author: Allan
 #
 
+### This file is used to convert the semeval English into our conllx format
+
 def process(filename:str, out:str):
     fres = open(out, 'w', encoding='utf-8')
     print(filename)
@@ -64,6 +66,8 @@ def process(filename:str, out:str):
             prev_label = label
             prev_raw_label = vals[12]
     fres.close()
+
+
 
 
 

@@ -89,13 +89,12 @@ def simple_batching(config, insts: List[Instance]):
         for wordIdx in range(word_seq_len[idx], max_seq_len):
             char_seq_tensor[idx, wordIdx, 0: 1] = torch.LongTensor([config.char2idx[PAD]])   ###because line 119 makes it 1, every single character should have a id. but actually 0 is enough
 
+    ### NOTE: make this step during forward if you have limited GPU resource.
     word_seq_tensor = word_seq_tensor.to(config.device)
     label_seq_tensor = label_seq_tensor.to(config.device)
     char_seq_tensor = char_seq_tensor.to(config.device)
     word_seq_len = word_seq_len.to(config.device)
     char_seq_len = char_seq_len.to(config.device)
-    # if config.use_elmo:
-    #     word_emb_tensor = word_emb_tensor.to(config.device)
     if config.dep_model != DepModelType.none:
         if config.dep_model == DepModelType.dglstm:
             batch_dep_heads = batch_dep_heads.to(config.device)
@@ -137,23 +136,6 @@ def head_to_adj(max_len, inst, config):
     return ret
 
 
-def head_to_adj_directed(max_len, inst, direction):
-    """
-    Convert a tree object to an (numpy) adjacency matrix.
-    """
-    ret = np.zeros((max_len, max_len), dtype=np.float32)
-
-    for i, head in enumerate(inst.input.heads):
-        if head == -1:
-            continue
-        if direction == "in":
-            ret[i, head] = 1
-        else:
-            ret[head, i] = 1
-
-    return ret
-
-
 def head_to_adj_label(max_len, inst, config):
     """
     Convert a tree object to an (numpy) adjacency matrix.
@@ -168,10 +150,7 @@ def head_to_adj_label(max_len, inst, config):
             continue
         dep_label_ret[head, i] = inst.dep_label_ids[i]
 
-        if config.double_dep_label:
-            dep_label_ret[i, head] = config.deplabel2idx[inst.input.dep_labels[i] + "_prime"]
-
-    if not directed and not config.double_dep_label:
+    if not directed:
         dep_label_ret = dep_label_ret + dep_label_ret.T
 
     if self_loop:

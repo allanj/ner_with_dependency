@@ -2,6 +2,11 @@
 # @author: Allan
 #
 
+### This file is used to convert the segmented Chinese into character-based represnetation
+## In order to run the Yang and Zhang's code for comparision
+
+
+
 def use_iobes(labels):
     for pos in range(len(labels)):
         curr_entity = labels[pos]

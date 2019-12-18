@@ -22,6 +22,7 @@ class Span:
 ## the input to the evaluation should already have
 ## have the predictions which is the label.
 ## iobest tagging scheme
+### NOTE: this function is used to evaluate the instances with prediction ready.
 def evaluate(insts):
 
     p = 0
@@ -93,8 +94,18 @@ def get_metric(p_num: int, total_num: int, total_predicted_num: int) -> Tuple[fl
     fscore = 2.0 * precision * recall / (precision + recall) if precision != 0 or recall != 0 else 0
     return precision, recall, fscore
 
-def evaluate_num(batch_insts, batch_pred_ids, batch_gold_ids, word_seq_lens, idx2label):
 
+
+def evaluate_num(batch_insts, batch_pred_ids, batch_gold_ids, word_seq_lens, idx2label):
+    """
+    evaluate the batch of instances
+    :param batch_insts:
+    :param batch_pred_ids:
+    :param batch_gold_ids:
+    :param word_seq_lens:
+    :param idx2label:
+    :return:
+    """
     p = 0
     total_entity = 0
     total_predict = 0
