@@ -46,6 +46,7 @@ Change the interaction function `inter_func = concatenation, addition, mlp` for 
 ##### Usage for other datasets and other languages
 Remember to put the dataset under the data folder. The naming rule for `train/dev/test` is `train.sd.conllx`, `dev.sd.conllx` and `test.sd.conllx`.
 Then simply change the `--dataset` name and `--embedding_file`. 
+
 Dataset | Embedding
 ------------ | -------------
 OntoNotes English | glove.6B.100d.txt
