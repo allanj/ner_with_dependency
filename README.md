@@ -91,3 +91,16 @@ I summarize how to preprocess the OntoNotes dataset.
 If you have the LDC license for OntoNotes, please send the proof (e.g., screenshot) to me and I will be happy to share the 
 preprocessed OntoNotes dataset with you.
  
+ 
+### Citation
+```
+@InProceedings{jie2019dependency, 
+    author = "Jie, Zhanming and Lu, Wei", 
+    title = "Dependency-Guided LSTM-CRF for Named Entity Recognition", 
+    booktitle = "Proceedings of EMNLP", 
+    year = "2019",
+    url = "https://www.aclweb.org/anthology/D19-1399",
+    doi = "10.18653/v1/D19-1399",
+    pages = "3860--3870"
+}
+```
