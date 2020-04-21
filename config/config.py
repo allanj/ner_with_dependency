@@ -204,15 +204,19 @@ class Config:
         scale = np.sqrt(3.0 / self.embedding_dim)
         if self.embedding is not None:
             print("[Info] Use the pretrained word embedding to initialize: %d x %d" % (len(self.word2idx), self.embedding_dim))
+            word_found_in_emb_vocab = 0
             self.word_embedding = np.empty([len(self.word2idx), self.embedding_dim])
             for word in self.word2idx:
                 if word in self.embedding:
                     self.word_embedding[self.word2idx[word], :] = self.embedding[word]
+                    word_found_in_emb_vocab += 1
                 elif word.lower() in self.embedding:
                     self.word_embedding[self.word2idx[word], :] = self.embedding[word.lower()]
+                    word_found_in_emb_vocab += 1
                 else:
                     # self.word_embedding[self.word2idx[word], :] = self.embedding[self.UNK]
                     self.word_embedding[self.word2idx[word], :] = np.random.uniform(-scale, scale, [1, self.embedding_dim])
+            print(f"[Info] {word_found_in_emb_vocab} out of {len(self.word2idx)} found in the pretrained embedding.")
             self.embedding = None
         else:
             self.word_embedding = np.empty([len(self.word2idx), self.embedding_dim])
