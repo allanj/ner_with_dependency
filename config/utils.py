@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from typing import List
+from typing import List, Dict
 from common.instance import Instance
 from config.eval import Span
 
@@ -23,6 +23,52 @@ def log_sum_exp_pytorch(vec):
     maxScoresExpanded = maxScores.view(vec.shape[0] ,1 , vec.shape[2]).expand(vec.shape[0], vec.shape[1], vec.shape[2])
     return maxScores + torch.log(torch.sum(torch.exp(vec - maxScoresExpanded), 1))
 
+
+
+def bert_batching(config, insts: List[Instance]) -> Dict[str,torch.Tensor]:
+    from config.config import DepModelType, ContextEmb
+    batch_size = len(insts)
+    batch_data = insts
+
+    word_seq_len = torch.LongTensor(list(map(lambda inst: len(inst.input.words), batch_data)))
+    max_seq_len = word_seq_len.max()
+
+    token_seq_len = torch.LongTensor(list(map(lambda inst: len(inst.word_ids), batch_data)))
+    max_tok_seq_len = token_seq_len.max()
+
+    word_seq_tensor = torch.zeros([batch_size, max_tok_seq_len], dtype=torch.long)
+    orig_to_tok_index = torch.zeros([batch_size, max_seq_len], dtype=torch.long)
+    label_seq_tensor = torch.zeros([batch_size, max_seq_len], dtype=torch.long)
+
+    dep_label_tensor = None
+    batch_dep_heads = None
+
+    if config.dep_model == DepModelType.dglstm:
+        batch_dep_heads = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
+        dep_label_tensor = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
+    """
+    Bert model needs an input mask
+    """
+    input_mask = torch.zeros([batch_size, max_tok_seq_len], dtype=torch.long)
+    for idx in range(batch_size):
+        word_seq_tensor[idx, :token_seq_len[idx]] = torch.LongTensor(batch_data[idx].word_ids)
+        orig_to_tok_index[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].orig_to_tok_index)
+        input_mask[idx, :token_seq_len[idx]]  = 1
+        if batch_data[idx].output_ids:
+            label_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].output_ids)
+        if config.dep_model == DepModelType.dglstm:
+            batch_dep_heads[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].dep_head_ids)
+            dep_label_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].dep_label_ids)
+
+    return  {
+        "word_seq_tensor": word_seq_tensor,
+        "word_seq_len": word_seq_len,
+        "orig_to_tok_index": orig_to_tok_index,
+        "input_mask": input_mask,
+        "labels": label_seq_tensor,
+        "batch_dep_heads": batch_dep_heads,
+        "dep_label_tensor": dep_label_tensor
+    }
 
 
 def simple_batching(config, insts: List[Instance]):
@@ -90,17 +136,27 @@ def simple_batching(config, insts: List[Instance]):
             char_seq_tensor[idx, wordIdx, 0: 1] = torch.LongTensor([config.char2idx[PAD]])   ###because line 119 makes it 1, every single character should have a id. but actually 0 is enough
 
     ### NOTE: make this step during forward if you have limited GPU resource.
-    word_seq_tensor = word_seq_tensor.to(config.device)
-    label_seq_tensor = label_seq_tensor.to(config.device)
-    char_seq_tensor = char_seq_tensor.to(config.device)
-    word_seq_len = word_seq_len.to(config.device)
-    char_seq_len = char_seq_len.to(config.device)
-    if config.dep_model != DepModelType.none:
-        if config.dep_model == DepModelType.dglstm:
-            batch_dep_heads = batch_dep_heads.to(config.device)
-            dep_label_tensor = dep_label_tensor.to(config.device)
+    # word_seq_tensor = word_seq_tensor.to(config.device)
+    # label_seq_tensor = label_seq_tensor.to(config.device)
+    # char_seq_tensor = char_seq_tensor.to(config.device)
+    # word_seq_len = word_seq_len.to(config.device)
+    # char_seq_len = char_seq_len.to(config.device)
+    # if config.dep_model != DepModelType.none:
+    #     if config.dep_model == DepModelType.dglstm:
+    #         batch_dep_heads = batch_dep_heads.to(config.device)
+    #         dep_label_tensor = dep_label_tensor.to(config.device)
 
-    return word_seq_tensor, word_seq_len, word_emb_tensor, char_seq_tensor, char_seq_len, adjs, adjs_in, adjs_out, graphs, dep_label_adj, batch_dep_heads, trees, label_seq_tensor, dep_label_tensor
+    return {
+        "word_seq_tensor": word_seq_tensor,
+        "word_seq_len": word_seq_len,
+        "context_emb": word_emb_tensor,
+        "chars": char_seq_tensor,
+        "char_seq_lens": char_seq_len,
+        "labels": label_seq_tensor,
+        "batch_dep_heads": batch_dep_heads,
+        "dep_label_tensor": dep_label_tensor
+    }
+    # return word_seq_tensor, word_seq_len, word_emb_tensor, char_seq_tensor, char_seq_len, adjs, adjs_in, adjs_out, graphs, dep_label_adj, batch_dep_heads, trees, label_seq_tensor, dep_label_tensor
 
 
 

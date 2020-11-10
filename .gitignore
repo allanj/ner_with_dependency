@@ -1,0 +1,6 @@
+.idea/*
+*.pyc
+*__pycache__*
+data/*
+model_files/*
+results/*

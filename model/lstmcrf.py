@@ -8,9 +8,16 @@ import torch.nn as nn
 from config.utils import START, STOP, PAD, log_sum_exp_pytorch
 from model.charbilstm import CharBiLSTM
 from model.deplabel_gcn import DepLabeledGCN
+from model.transformers_embedder import TransformersEmbedder
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from config.config import DepModelType, ContextEmb, InteractionFunction
 import torch.nn.functional as F
+
+def to_device(tensors, device):
+    res = ()
+    for tensor in tensors:
+        res += tensor.to(device)
+    return res
 
 class NNCRF(nn.Module):
 
@@ -34,15 +41,33 @@ class NNCRF(nn.Module):
 
 
         self.input_size = config.embedding_dim
+        self.embedder_type = config.embedder_type
+        if config.embedder_type == "normal":
+            if self.use_char:
+                self.char_feature = CharBiLSTM(config)
+                self.input_size += config.charlstm_hidden_dim
+            vocab_size = len(config.word2idx)
+            self.word_embedding = nn.Embedding.from_pretrained(torch.FloatTensor(config.word_embedding), freeze=False).to(self.device)
+            self.word_drop = nn.Dropout(config.dropout).to(self.device)
 
-        if self.use_char:
-            self.char_feature = CharBiLSTM(config)
-            self.input_size += config.charlstm_hidden_dim
+            """
+                Input size to LSTM description
+            """
+            self.charlstm_dim = config.charlstm_hidden_dim
+            if self.dep_model == DepModelType.dglstm:
+                self.input_size += config.embedding_dim + config.dep_emb_size
+                if self.use_char:
+                    self.input_size += config.charlstm_hidden_dim
 
-
-        vocab_size = len(config.word2idx)
-        self.word_embedding = nn.Embedding.from_pretrained(torch.FloatTensor(config.word_embedding), freeze=False).to(self.device)
-        self.word_drop = nn.Dropout(config.dropout).to(self.device)
+            if self.context_emb != ContextEmb.none:
+                self.input_size += config.context_emb_size
+            self.embedding_dim = config.embedding_dim
+        else:
+            self.word_embedding = TransformersEmbedder(config)
+            self.input_size = self.word_embedding.get_output_dim()
+            if self.dep_model == DepModelType.dglstm:
+                self.input_size += self.input_size + config.dep_emb_size
+            self.embedding_dim = self.word_embedding.get_output_dim()
 
         if self.dep_model == DepModelType.dglstm and self.interaction_func == InteractionFunction.mlp:
             self.mlp_layers = nn.ModuleList()
@@ -51,18 +76,6 @@ class NNCRF(nn.Module):
             self.mlp_head_linears = nn.ModuleList()
             for i in range(config.num_lstm_layer - 1):
                 self.mlp_head_linears.append(nn.Linear(config.hidden_dim, 2 * config.hidden_dim).to(self.device))
-
-        """
-            Input size to LSTM description
-        """
-        self.charlstm_dim = config.charlstm_hidden_dim
-        if self.dep_model == DepModelType.dglstm:
-            self.input_size += config.embedding_dim + config.dep_emb_size
-            if self.use_char:
-                self.input_size += config.charlstm_hidden_dim
-
-        if self.context_emb != ContextEmb.none:
-            self.input_size += config.context_emb_size
 
         print("[Model Info] Input size to LSTM: {}".format(self.input_size))
         print("[Model Info] LSTM Hidden Size: {}".format(config.hidden_dim))
@@ -76,7 +89,7 @@ class NNCRF(nn.Module):
 
         self.num_lstm_layer = config.num_lstm_layer
         self.lstm_hidden_dim = config.hidden_dim
-        self.embedding_dim = config.embedding_dim
+
         if config.num_lstm_layer > 1 and self.dep_model == DepModelType.dglstm:
             self.add_lstms = nn.ModuleList()
             if self.interaction_func == InteractionFunction.concatenation or \
@@ -116,7 +129,10 @@ class NNCRF(nn.Module):
         self.transition = nn.Parameter(init_transition)
 
 
-    def neural_scoring(self, word_seq_tensor, word_seq_lens, batch_context_emb, char_inputs, char_seq_lens, adj_matrixs, adjs_in, adjs_out, graphs, dep_label_adj, dep_head_tensor, dep_label_tensor, trees=None):
+    def neural_scoring(self, word_seq_tensor, word_seq_len, context_emb = None, chars = None,
+                       char_seq_lens = None, batch_dep_heads = None, dep_label_tensor =None,
+                       orig_to_tok_index: torch.Tensor = None,
+                       input_mask: torch.Tensor = None, **kwargs):
         """
         :param word_seq_tensor: (batch_size, sent_len)   NOTE: The word seq actually is already ordered before come here.
         :param word_seq_lens: (batch_size, 1)
@@ -128,21 +144,24 @@ class NNCRF(nn.Module):
         batch_size = word_seq_tensor.size(0)
         sent_len = word_seq_tensor.size(1)
 
-        word_emb = self.word_embedding(word_seq_tensor)
-        if self.use_char:
-            if self.dep_model == DepModelType.dglstm:
-                char_features = self.char_feature.get_last_hiddens(char_inputs, char_seq_lens)
-                word_emb = torch.cat((word_emb, char_features), 2)
+        if self.embedder_type == "normal":
+            word_emb = self.word_embedding(word_seq_tensor)
+            if self.use_char:
+                if self.dep_model == DepModelType.dglstm:
+                    char_features = self.char_feature.get_last_hiddens(chars, char_seq_lens)
+                    word_emb = torch.cat((word_emb, char_features), 2)
+        else:
+            word_emb = self.word_embedding(word_seq_tensor, orig_to_tok_index, input_mask)
         if self.dep_model == DepModelType.dglstm:
-            size = self.embedding_dim if not self.use_char else (self.embedding_dim + self.charlstm_dim)
-            dep_head_emb = torch.gather(word_emb, 1, dep_head_tensor.view(batch_size, sent_len, 1).expand(batch_size, sent_len, size))
+            size = self.embedding_dim if (not self.use_char or self.embedder_type!= "normal") else (self.embedding_dim + self.charlstm_dim)
+            dep_head_emb = torch.gather(word_emb, 1, batch_dep_heads.view(batch_size, sent_len, 1).expand(batch_size, sent_len, size))
 
         if self.context_emb != ContextEmb.none:
-            word_emb = torch.cat((word_emb, batch_context_emb.to(self.device)), 2)
+            word_emb = torch.cat((word_emb, context_emb.to(self.device)), 2)
 
-        if self.use_char:
+        if self.use_char and self.embedder_type == "normal":
             if self.dep_model != DepModelType.dglstm:
-                char_features = self.char_feature.get_last_hiddens(char_inputs, char_seq_lens)
+                char_features = self.char_feature.get_last_hiddens(chars, char_seq_lens)
                 word_emb = torch.cat((word_emb, char_features), 2)
 
         """
@@ -154,7 +173,7 @@ class NNCRF(nn.Module):
 
         word_rep = self.word_drop(word_emb)
 
-        sorted_seq_len, permIdx = word_seq_lens.sort(0, descending=True)
+        sorted_seq_len, permIdx = word_seq_len.sort(0, descending=True)
         _, recover_idx = permIdx.sort(0, descending=False)
         sorted_seq_tensor = word_rep[permIdx]
 
@@ -172,7 +191,7 @@ class NNCRF(nn.Module):
         """
         if self.num_lstm_layer > 1 and (self.dep_model == DepModelType.dglstm):
             for l in range(self.num_lstm_layer-1):
-                dep_head_emb = torch.gather(feature_out, 1, dep_head_tensor[permIdx].view(batch_size, sent_len, 1).expand(batch_size, sent_len, self.lstm_hidden_dim))
+                dep_head_emb = torch.gather(feature_out, 1, batch_dep_heads[permIdx].view(batch_size, sent_len, 1).expand(batch_size, sent_len, self.lstm_hidden_dim))
                 if self.interaction_func == InteractionFunction.concatenation:
                     feature_out = torch.cat((feature_out, dep_head_emb), 2)
                 elif self.interaction_func == InteractionFunction.addition:
@@ -185,11 +204,6 @@ class NNCRF(nn.Module):
                 lstm_out, _ = pad_packed_sequence(lstm_out, batch_first=True)  ## CARE: make sure here is batch_first, otherwise need to transpose.
                 feature_out = self.drop_lstm(lstm_out)
 
-        """
-        Model forward if we have GCN
-        """
-        if self.dep_model == DepModelType.dggcn:
-            feature_out = self.gcn(feature_out, sorted_seq_len, adj_matrixs[permIdx], dep_label_adj[permIdx])
 
         outputs = self.hidden2tag(feature_out)
 
@@ -244,19 +258,31 @@ class NNCRF(nn.Module):
             score += torch.sum(tagTransScoresMiddle.masked_select(masks[:, 1:]))
         return score
 
-    def neg_log_obj(self, words, word_seq_lens, batch_context_emb, chars, char_seq_lens, adj_matrixs, adjs_in, adjs_out, graphs, dep_label_adj, batch_dep_heads, tags, batch_dep_label, trees=None):
-        features = self.neural_scoring(words, word_seq_lens, batch_context_emb, chars, char_seq_lens, adj_matrixs, adjs_in, adjs_out, graphs, dep_label_adj, batch_dep_heads, batch_dep_label, trees)
+    def neg_log_obj(self, word_seq_tensor, word_seq_len,
+                    context_emb = None,
+                    chars = None,
+                    char_seq_lens = None, batch_dep_heads = None, labels = None, dep_label_tensor= None,
+                    orig_to_tok_index: torch.Tensor = None,
+                    input_mask: torch.Tensor = None):
+        word_seq_tensor = word_seq_tensor.to(self.device)
+        features = self.neural_scoring(word_seq_tensor= word_seq_tensor,
+                                       word_seq_len = word_seq_len,
+                                       context_emb= context_emb,
+                                       chars= chars,
+                                       char_seq_lens = char_seq_lens, batch_dep_heads=batch_dep_heads,
+                                       dep_label_tensor= dep_label_tensor,
+                                       orig_to_tok_index= orig_to_tok_index, input_mask=input_mask)
 
         all_scores = self.calculate_all_scores(features)
 
-        batch_size = words.size(0)
-        sent_len = words.size(1)
+        batch_size = word_seq_tensor.size(0)
+        sent_len = word_seq_tensor.size(1)
 
         maskTemp = torch.arange(1, sent_len + 1, dtype=torch.long).view(1, sent_len).expand(batch_size, sent_len).to(self.device)
-        mask = torch.le(maskTemp, word_seq_lens.view(batch_size, 1).expand(batch_size, sent_len)).to(self.device)
+        mask = torch.le(maskTemp, word_seq_len.view(batch_size, 1).expand(batch_size, sent_len)).to(self.device)
 
-        unlabed_score = self.forward_unlabeled(all_scores, word_seq_lens, mask)
-        labeled_score = self.forward_labeled(all_scores, word_seq_lens, tags, mask)
+        unlabed_score = self.forward_unlabeled(all_scores, word_seq_len, mask)
+        labeled_score = self.forward_labeled(all_scores, word_seq_len, labels, mask)
         return unlabed_score - labeled_score
 
 
@@ -292,9 +318,8 @@ class NNCRF(nn.Module):
 
         return bestScores, decodeIdx
 
-    def decode(self, batchInput):
-        wordSeqTensor, wordSeqLengths, batch_context_emb, charSeqTensor, charSeqLengths, adj_matrixs, adjs_in, adjs_out, graphs, dep_label_adj, batch_dep_heads, trees, tagSeqTensor, batch_dep_label = batchInput
-        features = self.neural_scoring(wordSeqTensor, wordSeqLengths, batch_context_emb,charSeqTensor,charSeqLengths, adj_matrixs, adjs_in, adjs_out, graphs, dep_label_adj, batch_dep_heads, batch_dep_label, trees)
+    def decode(self, batch):
+        features = self.neural_scoring(**batch)
         all_scores = self.calculate_all_scores(features)
-        bestScores, decodeIdx = self.viterbiDecode(all_scores, wordSeqLengths)
+        bestScores, decodeIdx = self.viterbiDecode(all_scores, batch["word_seq_len"])
         return bestScores, decodeIdx

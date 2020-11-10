@@ -119,6 +119,9 @@ class Config:
         self.interaction_func = InteractionFunction[args.inter_func] ## 0:concat, 1: addition, 2:gcn
 
 
+        self.embedder_type = args.embedder_type if "embedder_type" in args.__dict__ else "normal"
+
+
     # def print(self):
     #     print("")
     #     print("\tuse gpu: " + )

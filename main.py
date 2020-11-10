@@ -3,7 +3,7 @@ import argparse
 import random
 import numpy as np
 from config.reader import Reader
-from config import eval
+from config import eval, context_models
 from config.config import Config, ContextEmb, DepModelType
 import time
 from model.lstmcrf import NNCRF
@@ -11,6 +11,7 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 from config.utils import lr_decay, simple_batching, get_spans, preprocess
+from config.transformers_util import tokenize_instance, get_huggingface_optimizer_and_scheduler
 from typing import List
 from common.instance import Instance
 from termcolor import colored
@@ -35,8 +36,8 @@ def parse_arguments(parser):
     parser.add_argument('--digit2zero', action="store_true", default=True)
     parser.add_argument('--dataset', type=str, default="ontonotes")
     parser.add_argument('--affix', type=str, default="sd")
-    parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
-    # parser.add_argument('--embedding_file', type=str, default=None)
+    # parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
+    parser.add_argument('--embedding_file', type=str, default=None)
     parser.add_argument('--embedding_dim', type=int, default=100)
     parser.add_argument('--optimizer', type=str, default="sgd")
     parser.add_argument('--learning_rate', type=float, default=0.01) ##only for sgd now
@@ -45,9 +46,9 @@ def parse_arguments(parser):
     parser.add_argument('--lr_decay', type=float, default=0)
     parser.add_argument('--batch_size', type=int, default=10)
     parser.add_argument('--num_epochs', type=int, default=100)
-    parser.add_argument('--train_num', type=int, default=-1)
-    parser.add_argument('--dev_num', type=int, default=-1)
-    parser.add_argument('--test_num', type=int, default=-1)
+    parser.add_argument('--train_num', type=int, default=20)
+    parser.add_argument('--dev_num', type=int, default=20)
+    parser.add_argument('--test_num', type=int, default=20)
     parser.add_argument('--eval_freq', type=int, default=4000, help="evaluate frequency (iteration)")
     parser.add_argument('--eval_epoch', type=int, default=0, help="evaluate the dev set after this number of epoch")
 
@@ -73,6 +74,12 @@ def parse_arguments(parser):
     parser.add_argument('--inter_func', type=str, default="mlp", choices=["concatenation", "addition",  "mlp"], help="combination method, 0 concat, 1 additon, 2 gcn, 3 more parameter gcn")
     parser.add_argument('--context_emb', type=str, default="none", choices=["none", "bert", "elmo", "flair"], help="contextual word embedding")
 
+    parser.add_argument('--embedder_type', type=str, default="normal",
+                        choices=["normal"] + list(context_models.keys()),
+                        help="normal means word embedding + char, otherwise you can use 'bert-base-cased' and so on")
+    parser.add_argument('--parallel_embedder', type=int, default=0,
+                        choices=[0, 1],
+                        help="use parallel training for those (BERT) models in the transformers. Parallel on GPUs")
 
 
 
@@ -144,8 +151,7 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
         for index in np.random.permutation(len(batched_data)):
         # for index in range(len(batched_data)):
             model.train()
-            batch_word, batch_wordlen, batch_context_emb, batch_char, batch_charlen, adj_matrixs, adjs_in, adjs_out, graphs, dep_label_adj, batch_dep_heads, trees, batch_label, batch_dep_label = batched_data[index]
-            loss = model.neg_log_obj(batch_word, batch_wordlen, batch_context_emb,batch_char, batch_charlen, adj_matrixs, adjs_in, adjs_out, graphs, dep_label_adj, batch_dep_heads, batch_label, batch_dep_label, trees)
+            loss = model.neg_log_obj(**batched_data[index])
             epoch_loss += loss.item()
             loss.backward()
             if config.dep_model == DepModelType.dggcn:
@@ -189,7 +195,7 @@ def evaluate(config:Config, model: NNCRF, batch_insts_ids, name:str, insts: List
         one_batch_insts = insts[batch_id * batch_size:(batch_id + 1) * batch_size]
         sorted_batch_insts = sorted(one_batch_insts, key=lambda inst: len(inst.input.words), reverse=True)
         batch_max_scores, batch_max_ids = model.decode(batch)
-        metrics += eval.evaluate_num(sorted_batch_insts, batch_max_ids, batch[-2], batch[1], config.idx2labels)
+        metrics += eval.evaluate_num(sorted_batch_insts, batch_max_ids, batch["labels"], batch["word_seq_len"], config.idx2labels)
         batch_id += 1
     p, total_predict, total_entity = metrics[0], metrics[1], metrics[2]
     precision = p * 1.0 / total_predict * 100 if total_predict != 0 else 0
@@ -273,17 +279,25 @@ def main():
     print("# deplabels: ", len(conf.deplabels))
     print("dep label 2idx: ", conf.deplabel2idx)
 
+    if conf.embedder_type == "normal":
+        conf.build_word_idx(trains, devs, tests)
+        conf.build_emb_table()
+        conf.map_insts_ids(trains + devs + tests)
 
-    conf.build_word_idx(trains, devs, tests)
-    conf.build_emb_table()
-    conf.map_insts_ids(trains + devs + tests)
 
+        print("num chars: " + str(conf.num_char))
+        # print(str(config.char2idx))
 
-    print("num chars: " + str(conf.num_char))
-    # print(str(config.char2idx))
-
-    print("num words: " + str(len(conf.word2idx)))
-    # print(config.word2idx)
+        print("num words: " + str(len(conf.word2idx)))
+        # print(config.word2idx)
+    else:
+        """
+        If we use the pretrained model from transformers
+        we need to use the pretrained tokenizer
+        """
+        print(colored(f"[Data Info] Tokenizing the instances using '{conf.embedder_type}' tokenizer", "red"))
+        tokenize_instance(context_models[conf.embedder_type]["tokenizer"].from_pretrained(conf.embedder_type),
+                          trains + devs + tests, conf.label2idx)
     if opt.mode == "train":
         if conf.train_num != -1:
             random.shuffle(trains)
