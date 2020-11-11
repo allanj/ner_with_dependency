@@ -332,7 +332,7 @@ class NNCRF(nn.Module):
 
     def decode(self, batch):
         for key, value in batch.items():
-            if key == "word_seq_len":
+            if key == "word_seq_len" and key == "char_seq_lens":
                 continue
             batch[key] = batch[key].to(self.device) if batch[key] is not None else None
         features = self.neural_scoring(**batch)
