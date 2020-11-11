@@ -175,7 +175,7 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
             loss = model.neg_log_obj(**batched_data[index])
             epoch_loss += loss.item()
             loss.backward()
-            if config.dep_model == DepModelType.dggcn:
+            if config.embedder_type != "normal":
                 torch.nn.utils.clip_grad_norm_(model.parameters(), config.clip) ##clipping the gradient
             optimizer.step()
             model.zero_grad()

@@ -85,7 +85,7 @@ class Config:
         self.dev_num = args.dev_num
         self.test_num = args.test_num
         self.batch_size = args.batch_size
-        self.clip = 5
+        self.clip = 1.0
         self.lr_decay = args.lr_decay
         self.device = torch.device(args.device)
 
