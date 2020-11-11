@@ -317,6 +317,7 @@ def main():
         If we use the pretrained model from transformers
         we need to use the pretrained tokenizer
         """
+        conf.map_insts_dep_ids(trains + devs + tests)
         print(colored(f"[Data Info] Tokenizing the instances using '{conf.embedder_type}' tokenizer", "red"))
         tokenize_instance(context_models[conf.embedder_type]["tokenizer"].from_pretrained(conf.embedder_type),
                           trains + devs + tests, conf.label2idx)

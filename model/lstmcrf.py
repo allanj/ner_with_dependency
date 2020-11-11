@@ -142,7 +142,7 @@ class NNCRF(nn.Module):
         :return: emission scores (batch_size, sent_len, hidden_dim)
         """
         batch_size = word_seq_tensor.size(0)
-        sent_len = word_seq_tensor.size(1)
+        sent_len = max(word_seq_len)
 
         if self.embedder_type == "normal":
             word_emb = self.word_embedding(word_seq_tensor)

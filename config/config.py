@@ -296,7 +296,7 @@ class Config:
                 inst.char_ids.append(char_id)
             for i, head in enumerate(inst.input.heads):
                 if head == -1:
-                    inst.dep_head_ids.append(i) ## appended it self.
+                    inst.dep_head_ids.append(i)  ## appended it self.
                 else:
                     inst.dep_head_ids.append(head)
             for label in inst.input.dep_labels:
@@ -305,3 +305,15 @@ class Config:
                 inst.output_ids.append(self.label2idx[label])
             insts_ids.append([inst.word_ids, inst.char_ids, inst.output_ids])
         return insts_ids
+
+    def map_insts_dep_ids(self, insts: List[Instance]):
+        for inst in insts:
+            inst.dep_label_ids = []
+            inst.dep_head_ids = []
+            for i, head in enumerate(inst.input.heads):
+                if head == -1:
+                    inst.dep_head_ids.append(i) ## appended it self.
+                else:
+                    inst.dep_head_ids.append(head)
+            for label in inst.input.dep_labels:
+                inst.dep_label_ids.append(self.deplabel2idx[label])
