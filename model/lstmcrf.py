@@ -269,7 +269,7 @@ class NNCRF(nn.Module):
         # word_seq_len = word_seq_len.to(self.device)
         context_emb = context_emb.to(self.device) if context_emb is not None else None
         chars = chars.to(self.device) if chars is not None else None
-        char_seq_lens = char_seq_lens.to(self.device) if char_seq_lens is not None else None
+        # char_seq_lens = char_seq_lens.to(self.device) if char_seq_lens is not None else None
         batch_dep_heads = batch_dep_heads.to(self.device) if batch_dep_heads is not None else None
         labels = labels.to(self.device) if labels is not None else None
         dep_label_tensor = dep_label_tensor.to(self.device) if dep_label_tensor is not None else None
