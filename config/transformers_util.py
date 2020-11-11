@@ -82,6 +82,6 @@ def tokenize_instance(transformer_tokenizer: PreTrainedTokenizer, insts: List[In
                 inst.output_ids.append(label2idx[label])
 
         input_ids = transformer_tokenizer.convert_tokens_to_ids([transformer_tokenizer.cls_token] + tokens + [transformer_tokenizer.sep_token])
-        inst.word_ids = input_ids
+        inst.transformers_word_ids = input_ids
         inst.orig_to_tok_index = orig_to_tok_index
     print(f"maximum token length is: {maximum_token_length}")

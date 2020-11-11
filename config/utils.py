@@ -26,48 +26,43 @@ def log_sum_exp_pytorch(vec):
 
 
 def bert_batching(config, insts: List[Instance]) -> Dict[str,torch.Tensor]:
-    from config.config import DepModelType, ContextEmb
     batch_size = len(insts)
     batch_data = insts
 
     word_seq_len = torch.LongTensor(list(map(lambda inst: len(inst.input.words), batch_data)))
     max_seq_len = word_seq_len.max()
 
-    token_seq_len = torch.LongTensor(list(map(lambda inst: len(inst.word_ids), batch_data)))
+    token_seq_len = torch.LongTensor(list(map(lambda inst: len(inst.transformers_word_ids), batch_data)))
     max_tok_seq_len = token_seq_len.max()
 
     word_seq_tensor = torch.zeros([batch_size, max_tok_seq_len], dtype=torch.long)
     orig_to_tok_index = torch.zeros([batch_size, max_seq_len], dtype=torch.long)
-    label_seq_tensor = torch.zeros([batch_size, max_seq_len], dtype=torch.long)
-
-    dep_label_tensor = None
-    batch_dep_heads = None
-
-    if config.dep_model == DepModelType.dglstm:
-        batch_dep_heads = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
-        dep_label_tensor = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
+    # label_seq_tensor = torch.zeros([batch_size, max_seq_len], dtype=torch.long)
+    #
+    # dep_label_tensor = None
+    # batch_dep_heads = None
+    #
+    # if config.dep_model == DepModelType.dglstm:
+    #     batch_dep_heads = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
+    #     dep_label_tensor = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
     """
     Bert model needs an input mask
     """
     input_mask = torch.zeros([batch_size, max_tok_seq_len], dtype=torch.long)
     for idx in range(batch_size):
-        word_seq_tensor[idx, :token_seq_len[idx]] = torch.LongTensor(batch_data[idx].word_ids)
+        word_seq_tensor[idx, :token_seq_len[idx]] = torch.LongTensor(batch_data[idx].transformers_word_ids)
         orig_to_tok_index[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].orig_to_tok_index)
         input_mask[idx, :token_seq_len[idx]]  = 1
-        if batch_data[idx].output_ids:
-            label_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].output_ids)
-        if config.dep_model == DepModelType.dglstm:
-            batch_dep_heads[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].dep_head_ids)
-            dep_label_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].dep_label_ids)
+        # if batch_data[idx].output_ids:
+        #     label_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].output_ids)
+        # if config.dep_model == DepModelType.dglstm:
+        #     batch_dep_heads[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].dep_head_ids)
+        #     dep_label_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].dep_label_ids)
 
     return  {
-        "word_seq_tensor": word_seq_tensor,
-        "word_seq_len": word_seq_len,
+        "transformers_word_seq_tensor": word_seq_tensor,
         "orig_to_tok_index": orig_to_tok_index,
         "input_mask": input_mask,
-        "labels": label_seq_tensor,
-        "batch_dep_heads": batch_dep_heads,
-        "dep_label_tensor": dep_label_tensor
     }
 
 
@@ -85,7 +80,8 @@ def simple_batching(config, insts: List[Instance]):
         label_seq_tensor
     """
     batch_size = len(insts)
-    batch_data = sorted(insts, key=lambda inst: len(inst.input.words), reverse=True) ##object-based not direct copy
+    # batch_data = sorted(insts, key=lambda inst: len(inst.input.words), reverse=True) ##object-based not direct copy
+    batch_data = insts
     word_seq_len = torch.LongTensor(list(map(lambda inst: len(inst.input.words), batch_data)))
     max_seq_len = word_seq_len.max()
     ### NOTE: the 1 here might be used later?? We will make this as padding, because later we have to do a deduction.
@@ -101,26 +97,13 @@ def simple_batching(config, insts: List[Instance]):
     word_seq_tensor = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
     label_seq_tensor =  torch.zeros((batch_size, max_seq_len), dtype=torch.long)
     char_seq_tensor = torch.zeros((batch_size, max_seq_len, max_char_seq_len), dtype=torch.long)
-    adjs = None
-    adjs_in = None
-    adjs_out = None
-    dep_label_adj = None
     dep_label_tensor = None
     batch_dep_heads = None
-    trees = None
-    graphs = None
     if config.dep_model != DepModelType.none:
-        if  config.dep_model == DepModelType.dggcn:
-            adjs = [ head_to_adj(max_seq_len, inst, config) for inst in batch_data]
-            adjs = np.stack(adjs, axis=0)
-            adjs = torch.from_numpy(adjs)
-            dep_label_adj = [head_to_adj_label(max_seq_len, inst, config) for inst in batch_data]
-            dep_label_adj = torch.from_numpy(np.stack(dep_label_adj, axis=0)).long()
 
         if config.dep_model == DepModelType.dglstm:
             batch_dep_heads = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
             dep_label_tensor = torch.zeros((batch_size, max_seq_len), dtype=torch.long)
-        # trees = [inst.tree for inst in batch_data]
     for idx in range(batch_size):
         word_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].word_ids)
         label_seq_tensor[idx, :word_seq_len[idx]] = torch.LongTensor(batch_data[idx].output_ids)
@@ -135,16 +118,6 @@ def simple_batching(config, insts: List[Instance]):
         for wordIdx in range(word_seq_len[idx], max_seq_len):
             char_seq_tensor[idx, wordIdx, 0: 1] = torch.LongTensor([config.char2idx[PAD]])   ###because line 119 makes it 1, every single character should have a id. but actually 0 is enough
 
-    ### NOTE: make this step during forward if you have limited GPU resource.
-    # word_seq_tensor = word_seq_tensor.to(config.device)
-    # label_seq_tensor = label_seq_tensor.to(config.device)
-    # char_seq_tensor = char_seq_tensor.to(config.device)
-    # word_seq_len = word_seq_len.to(config.device)
-    # char_seq_len = char_seq_len.to(config.device)
-    # if config.dep_model != DepModelType.none:
-    #     if config.dep_model == DepModelType.dglstm:
-    #         batch_dep_heads = batch_dep_heads.to(config.device)
-    #         dep_label_tensor = dep_label_tensor.to(config.device)
 
     return {
         "word_seq_tensor": word_seq_tensor,

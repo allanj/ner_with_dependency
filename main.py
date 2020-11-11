@@ -36,8 +36,8 @@ def parse_arguments(parser):
     parser.add_argument('--digit2zero', action="store_true", default=True)
     parser.add_argument('--dataset', type=str, default="ontonotes")
     parser.add_argument('--affix', type=str, default="sd")
-    # parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
-    parser.add_argument('--embedding_file', type=str, default=None)
+    parser.add_argument('--embedding_file', type=str, default="data/glove.6B.100d.txt")
+    # parser.add_argument('--embedding_file', type=str, default=None)
     parser.add_argument('--embedding_dim', type=int, default=100)
     parser.add_argument('--optimizer', type=str, default="adamw")
     parser.add_argument('--learning_rate', type=float, default=2e-5) ##only for sgd now
@@ -68,7 +68,7 @@ def parse_arguments(parser):
 
     ##NOTE: this dropout applies to many places
     parser.add_argument('--dropout', type=float, default=0.5, help="dropout for embedding")
-    parser.add_argument('--use_char_rnn', type=int, default=0, choices=[0, 1], help="use character-level lstm, 0 or 1")
+    parser.add_argument('--use_char_rnn', type=int, default=1, choices=[0, 1], help="use character-level lstm, 0 or 1")
     parser.add_argument('--dep_model', type=str, default="none", choices=["none", "dggcn", "dglstm"], help="dependency method")
     parser.add_argument('--inter_func', type=str, default="mlp", choices=["concatenation", "addition",  "mlp"], help="combination method, 0 concat, 1 additon, 2 gcn, 3 more parameter gcn")
     parser.add_argument('--context_emb', type=str, default="none", choices=["none", "bert", "elmo", "flair"], help="contextual word embedding")
@@ -107,10 +107,10 @@ def batching_list_instances(config: Config, insts:List[Instance]):
     batched_data = []
     for batch_id in range(total_batch):
         one_batch_insts = insts[batch_id * batch_size:(batch_id + 1) * batch_size]
+        current_batch = simple_batching(config, one_batch_insts)
         if config.embedder_type != "normal":
-            batched_data.append(bert_batching(config, one_batch_insts))
-        else:
-            batched_data.append(simple_batching(config, one_batch_insts))
+            current_batch.update(bert_batching(config, one_batch_insts))
+        batched_data.append(current_batch)
 
     return batched_data
 
@@ -175,7 +175,7 @@ def learn_from_insts(config:Config, epoch: int, train_insts, dev_insts, test_ins
             loss = model.neg_log_obj(**batched_data[index])
             epoch_loss += loss.item()
             loss.backward()
-            if config.dep_model == DepModelType.dggcn:
+            if config.embedder_type != "normal":
                 torch.nn.utils.clip_grad_norm_(model.parameters(), config.clip) ##clipping the gradient
             optimizer.step()
             model.zero_grad()
@@ -301,23 +301,21 @@ def main():
     print("# deplabels: ", len(conf.deplabels))
     print("dep label 2idx: ", conf.deplabel2idx)
 
-    if conf.embedder_type == "normal":
-        conf.build_word_idx(trains, devs, tests)
-        conf.build_emb_table()
-        conf.map_insts_ids(trains + devs + tests)
+    conf.build_word_idx(trains, devs, tests)
+    conf.build_emb_table()
+    conf.map_insts_ids(trains + devs + tests)
 
 
-        print("num chars: " + str(conf.num_char))
-        # print(str(config.char2idx))
+    print("num chars: " + str(conf.num_char))
+    # print(str(config.char2idx))
 
-        print("num words: " + str(len(conf.word2idx)))
-        # print(config.word2idx)
-    else:
+    print("num words: " + str(len(conf.word2idx)))
+    # print(config.word2idx)
+    if conf.embedder_type != "normal":
         """
         If we use the pretrained model from transformers
         we need to use the pretrained tokenizer
         """
-        conf.map_insts_dep_ids(trains + devs + tests)
         print(colored(f"[Data Info] Tokenizing the instances using '{conf.embedder_type}' tokenizer", "red"))
         tokenize_instance(context_models[conf.embedder_type]["tokenizer"].from_pretrained(conf.embedder_type),
                           trains + devs + tests, conf.label2idx)
