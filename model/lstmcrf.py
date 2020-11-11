@@ -171,7 +171,10 @@ class NNCRF(nn.Module):
             dep_emb = self.dep_label_embedding(dep_label_tensor)
             word_emb = torch.cat((word_emb, dep_head_emb, dep_emb), 2)
 
-        word_rep = self.word_drop(word_emb)
+        if self.embedder_type == "normal":
+            word_rep = self.word_drop(word_emb)
+        else:
+            word_rep = word_emb
 
         sorted_seq_len, permIdx = word_seq_len.sort(0, descending=True)
         _, recover_idx = permIdx.sort(0, descending=False)
@@ -265,6 +268,15 @@ class NNCRF(nn.Module):
                     orig_to_tok_index: torch.Tensor = None,
                     input_mask: torch.Tensor = None):
         word_seq_tensor = word_seq_tensor.to(self.device)
+        # word_seq_len = word_seq_len.to(self.device)
+        context_emb = context_emb.to(self.device) if context_emb is not None else None
+        chars = chars.to(self.device) if chars is not None else None
+        char_seq_lens = char_seq_lens.to(self.device) if char_seq_lens is not None else None
+        batch_dep_heads = batch_dep_heads.to(self.device) if batch_dep_heads is not None else None
+        labels = labels.to(self.device) if labels is not None else None
+        dep_label_tensor = dep_label_tensor.to(self.device) if dep_label_tensor is not None else None
+        orig_to_tok_index = orig_to_tok_index.to(self.device) if orig_to_tok_index is not None else None
+        input_mask = input_mask.to(self.device) if input_mask is not None else None
         features = self.neural_scoring(word_seq_tensor= word_seq_tensor,
                                        word_seq_len = word_seq_len,
                                        context_emb= context_emb,
@@ -276,17 +288,18 @@ class NNCRF(nn.Module):
         all_scores = self.calculate_all_scores(features)
 
         batch_size = word_seq_tensor.size(0)
-        sent_len = word_seq_tensor.size(1)
-
+        sent_len = all_scores.size(1)
+        seq_len = word_seq_len.to(self.device)
         maskTemp = torch.arange(1, sent_len + 1, dtype=torch.long).view(1, sent_len).expand(batch_size, sent_len).to(self.device)
-        mask = torch.le(maskTemp, word_seq_len.view(batch_size, 1).expand(batch_size, sent_len)).to(self.device)
+        mask = torch.le(maskTemp, seq_len.view(batch_size, 1).expand(batch_size, sent_len)).to(self.device)
 
-        unlabed_score = self.forward_unlabeled(all_scores, word_seq_len, mask)
-        labeled_score = self.forward_labeled(all_scores, word_seq_len, labels, mask)
+        unlabed_score = self.forward_unlabeled(all_scores, seq_len, mask)
+        labeled_score = self.forward_labeled(all_scores, seq_len, labels, mask)
         return unlabed_score - labeled_score
 
 
     def viterbiDecode(self, all_scores, word_seq_lens):
+        word_seq_lens = word_seq_lens.to(self.device)
         batchSize = all_scores.shape[0]
         sentLength = all_scores.shape[1]
         # sent_len =
@@ -319,6 +332,10 @@ class NNCRF(nn.Module):
         return bestScores, decodeIdx
 
     def decode(self, batch):
+        for key, value in batch.items():
+            if key == "word_seq_len":
+                continue
+            batch[key] = batch[key].to(self.device) if batch[key] is not None else None
         features = self.neural_scoring(**batch)
         all_scores = self.calculate_all_scores(features)
         bestScores, decodeIdx = self.viterbiDecode(all_scores, batch["word_seq_len"])

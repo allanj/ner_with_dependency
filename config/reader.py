@@ -28,15 +28,17 @@ class Reader:
             deps = []
             labels = []
             tags = []
+            ori_words = []
             for line in tqdm(f.readlines()):
                 line = line.rstrip()
                 if line == "":
-                    insts.append(Instance(Sentence(words, heads, deps, tags), labels))
+                    insts.append(Instance(Sentence(words, heads, deps, tags, ori_words=ori_words), labels))
                     words = []
                     heads = []
                     deps = []
                     labels = []
                     tags = []
+                    ori_words = []
                     find_root = False
                     if len(insts) == number:
                         break
@@ -50,6 +52,7 @@ class Reader:
                 dep_label = vals[7]
                 pos = vals[3]
                 label = vals[10]
+                ori_words.append(word)
                 if self.digit2zero:
                     word = re.sub('\d', '0', word) # replace digit with 0.
                 words.append(word)

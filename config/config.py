@@ -120,7 +120,7 @@ class Config:
 
 
         self.embedder_type = args.embedder_type if "embedder_type" in args.__dict__ else "normal"
-
+        self.parallel_embedder = args.parallel_embedder
 
     # def print(self):
     #     print("")

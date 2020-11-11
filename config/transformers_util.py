@@ -56,6 +56,7 @@ def tokenize_instance(transformer_tokenizer: PreTrainedTokenizer, insts: List[In
     :param insts: List[List[Instance]
     :return: None
     """
+    maximum_token_length = 0
     for inst in insts:
         tokens = [] ## store the wordpiece tokens
         orig_to_tok_index = []
@@ -74,6 +75,7 @@ def tokenize_instance(transformer_tokenizer: PreTrainedTokenizer, insts: List[In
             word_tokens = transformer_tokenizer.tokenize(" " + word)
             for sub_token in word_tokens:
                 tokens.append(sub_token)
+        maximum_token_length = max(len(tokens), maximum_token_length)
         if inst.output:
             inst.output_ids = []
             for label in inst.output:
@@ -82,3 +84,4 @@ def tokenize_instance(transformer_tokenizer: PreTrainedTokenizer, insts: List[In
         input_ids = transformer_tokenizer.convert_tokens_to_ids([transformer_tokenizer.cls_token] + tokens + [transformer_tokenizer.sep_token])
         inst.word_ids = input_ids
         inst.orig_to_tok_index = orig_to_tok_index
+    print(f"maximum token length is: {maximum_token_length}")
