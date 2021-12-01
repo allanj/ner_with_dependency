@@ -79,7 +79,7 @@ We use the ELMo from AllenNLP for English, and use [ELMoForManyLangs](https://gi
   ```
 
 
-### Notes on Dataset Preprocessing
+### Notes on Dataset Preprocessing (Two Options)
 
 #### OntoNotes Preprocessing
 Many people are asking for the OntoNotes 5.0 dataset. 
@@ -87,10 +87,8 @@ I understand that it is hard to get the correct split as in previous work (Chiu 
 If you want to get the correct split, you can refere to a guide [here](https://github.com/allanj/pytorch_lstmcrf/blob/master/docs/benchmark.md) where 
 I summarize how to preprocess the OntoNotes dataset.
 
-#### Without Preprocessing
-If you have the LDC license for OntoNotes, please send the proof (e.g., screenshot) to me and I will be happy to share the 
-preprocessed OntoNotes dataset with you.
- 
+#### Download Our Preprocessed dataset
+We notice that the OntoNotes 5.0 dataset has been freely available on LDC. We will also release our link to our pre-processed OntoNotes here ([__English__](https://drive.google.com/file/d/1AAWnb5GlDiNMj3yNoaoQtoKHj7iSqNey/view?usp=sharing), [__Chinese__](https://drive.google.com/file/d/10t3XpZzsD67ji0a7sw9nHM7I5UhrJcdf/view?usp=sharing)).
  
 ### Citation
 ```
